@@ -72,14 +72,26 @@ dialog{width:100vw;max-width:100vw;max-height:100dvh;border-radius:0;border:0}
 }
 .lb{cursor:pointer;background:var(--ac);color:#241c04;border-radius:6px;padding:7px 11px;font-weight:600}
 .vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+#tabs{display:flex;gap:6px;padding:10px 20px 0}#tabs button.on{background:var(--ac);color:#241c04;border-color:var(--ac);font-weight:600}
+.chips{flex-wrap:wrap}.chip.t{width:auto;border-radius:15px;padding:0 10px;font-size:12px;font-weight:600;background:var(--pn);color:var(--tx)}#fx{opacity:1}
+.pb{position:absolute;left:4px;bottom:4px;background:#000b;color:#fff;font:600 11px "Segoe UI",sans-serif;padding:1px 6px;border-radius:8px;font-style:normal}
+.fo{position:absolute;left:4px;top:4px;background:linear-gradient(90deg,#f7a,#7af,#af7);color:#111;font:700 10px "Segoe UI",sans-serif;padding:1px 6px;border-radius:8px;font-style:normal}
+.list .card .pb,.list .card .fo{display:none}
+.fi{background:var(--pn);border:1px solid var(--ln);border-radius:8px;padding:12px 14px;cursor:pointer;display:grid;gap:3px}.fi:hover{border-color:var(--ac)}.fi small{color:var(--mu)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:12px 0}
+.chd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 0 4px}.chd h2{border:0;margin:0;padding:0}
+.fld{display:block;color:var(--mu);font-size:12px;margin-top:8px}.sl{width:100%;margin-top:4px}
+#nn{flex:1;min-width:160px;font:inherit;color:var(--tx);background:var(--pn);border:1px solid var(--ln);border-radius:6px;padding:7px 11px}
+@media(max-width:640px){#tabs{padding:10px 14px 0}#tabs button{flex:1}}
 </style></head>
 <body>
 <header>
 <h1>Meine Sammlung</h1><div id="stats"></div>
 <div class="acts"><button class="pri" id="sc">Scannen</button><button id="open">Importieren</button><button id="tg">Filter</button></div>
-<details class="more"><summary>Mehr</summary><div><button id="bk">Backup speichern</button><button id="ld">Backup laden</button><button id="cp">Als Text kopieren</button></div></details><input type="file" id="file" accept=".json" hidden>
+<details class="more"><summary>Mehr</summary><div><button id="bk">Backup speichern</button><button id="ld">Backup laden</button><button id="cp">Als Text kopieren</button><button id="pr">Preise aktualisieren</button></div></details><input type="file" id="file" accept=".json" hidden>
 </header>
-<div class="bar">
+<nav id="tabs"><button data-t="sam">Sammlung</button><button data-t="ord">Ordner</button><button data-t="dek">Decklisten</button></nav>
+<div class="bar" id="bar">
 <input type="search" id="q" placeholder="Suchen (Name, Typ, Text)" aria-label="Suchen"><div id="opts">
 <label>Gruppieren <select id="gr"><option value="none">Keine</option><option value="farbe">Farbe</option><option value="mana">Manawert</option><option value="typ">Kartentyp</option><option value="set">Edition</option><option value="rar">Seltenheit</option></select></label>
 <label>Sortieren <select id="so"><option value="name">Name A–Z</option><option value="mana">Manakosten</option><option value="farbe">Farbe</option><option value="preis">Preis</option><option value="neu">Zuletzt hinzugefügt</option></select></label>
@@ -93,7 +105,8 @@ dialog{width:100vw;max-width:100vw;max-height:100dvh;border-radius:0;border:0}
 <h2>Karten importieren</h2>
 <p>Liste einfügen, eine Karte pro Zeile, z. B. <b>4 Lightning Bolt</b> oder <b>1 Sol Ring (C21) 263</b>. Auch Exporte aus ManaBox, Moxfield oder Archidekt (Text oder CSV) funktionieren. Kartennamen können Deutsch oder Englisch sein (deutsche Namen werden einzeln gesucht, das dauert etwas länger).</p>
 <textarea id="txt" spellcheck="false" placeholder="4 Lightning Bolt&#10;2 Counterspell&#10;1 Sol Ring"></textarea>
-<div class="row"><label><input type="checkbox" id="rep"> Bestehende Sammlung ersetzen</label></div>
+<div class="row"><label>Ziel <select id="tgt"></select></label><input id="dn" placeholder="Name der neuen Decklist" aria-label="Name der Decklist" style="display:none;flex:1;min-width:140px;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--ln);border-radius:6px;padding:7px 11px"></div>
+<div class="row"><label><input type="checkbox" id="rep"> Inhalt des Ziels ersetzen</label></div>
 <div class="row"><button class="pri" id="go">Importieren</button><button id="cl">Schließen</button></div>
 <div id="st"></div></div></div></dialog>
 <dialog id="scn"><div class="dl" style="display:block"><h2>Karten scannen</h2>
@@ -109,9 +122,16 @@ dialog{width:100vw;max-width:100vw;max-height:100dvh;border-radius:0;border:0}
 
 <script>
 const $=s=>document.querySelector(s), LS='mtg-sammlung-v1';
-let col={},act=new Set(),cur=null;
-try{col=JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){}
-const save=()=>{try{localStorage.setItem(LS,JSON.stringify(col))}catch(e){alert('Speichern im Browser fehlgeschlagen. Bitte ein Backup exportieren.')}};
+let col={},ct={},F={col:new Set(),rar:new Set(),typ:new Set(),fol:new Set()},tab='sam',cur='';
+const FL={'':'Normal',foil:'Foil',etched:'Geätzt'};
+const migrate=o=>{const r={};for(const k in o){const e=o[k];e.f=e.f||'';e.fo=e.fo||'';r[k.includes('|')?k:k+'||']=e}return r};
+try{col=migrate(JSON.parse(localStorage.getItem(LS)||'{}'));ct=JSON.parse(localStorage.getItem(LS+'-ct')||'{}')}catch(e){}
+const save=()=>{try{localStorage.setItem(LS,JSON.stringify(col));localStorage.setItem(LS+'-ct',JSON.stringify(ct))}catch(e){alert('Speichern im Browser fehlgeschlagen. Bitte ein Backup exportieren.')}};
+const K=(id,f,fo)=>`${id}|${f}|${fo}`;
+const price=e=>(e.f==='foil'?e.c.pf:e.f==='etched'?e.c.pe:e.c.p)||0;
+function put(c,q,f,fo){const k=K(c.id,f,fo),x=col[k];x?x.q+=q:col[k]={c:slim(c),q,t:Date.now(),f,fo}}
+function dflt(c,f){const fin=c.finishes||[];return f&&(fin.includes(f)||!fin.length)?f:(fin.length&&!fin.includes('nonfoil')?fin[0]:'')}
+function move(k,ch){const x=col[k];delete col[k];const f=ch.f!==undefined?ch.f:x.f,fo=ch.fo!==undefined?ch.fo:x.fo,c=ch.c||x.c,nk=K(c.id,f,fo),y=col[nk];y?y.q+=x.q:col[nk]={...x,c,f,fo};save();render();return nk}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const eur=n=>n.toLocaleString('de-DE',{style:'currency',currency:'EUR'});
 const CN={W:'Weiß',U:'Blau',B:'Schwarz',R:'Rot',G:'Grün',M:'Mehrfarbig',C:'Farblos',L:'Länder'},ORD=['W','U','B','R','G','M','C','L'];
@@ -142,54 +162,101 @@ const small=u=>u.replace('/normal/','/small/');
 function slim(c){
  const f=(c.card_faces||[])[0]||{},im=c.image_uris||f.image_uris||{},b=(c.card_faces||[])[1];
  return{id:c.id,n:c.name,d:c.printed_name||f.printed_name||'',mc:c.mana_cost||f.mana_cost||'',cmc:c.cmc||0,co:c.colors||f.colors||[],t:c.type_line,r:c.rarity,s:c.set,sn:c.set_name,cn:c.collector_number,
- i:im.normal||'',i2:!c.image_uris&&b&&b.image_uris?b.image_uris.normal:'',p:parseFloat((c.prices||{}).eur)||0,o:c.printed_text||f.printed_text||c.oracle_text||f.oracle_text||''};
+ i:im.normal||'',i2:!c.image_uris&&b&&b.image_uris?b.image_uris.normal:'',p:parseFloat((c.prices||{}).eur)||0,pf:parseFloat((c.prices||{}).eur_foil)||0,pe:parseFloat((c.prices||{}).eur_etched)||0,fin:c.finishes||[],pm:c.promo_types||[],oi:c.oracle_id||'',o:c.printed_text||f.printed_text||c.oracle_text||f.oracle_text||''};
 }
 
+function stats(){
+ const a=Object.values(col).filter(e=>e.fo===''),n=a.reduce((t,e)=>t+e.q,0),v=a.reduce((t,e)=>t+price(e)*e.q,0);
+ $('#stats').textContent=a.length?`Sammlung: ${n} Karten, ${a.length} verschiedene, Gesamtwert ca. ${eur(v)}`:'';
+}
+function bindHead(){
+ document.querySelectorAll('#main .fi').forEach(el=>el.onclick=()=>{cur=el.dataset.c;tab=ct[cur].k==='d'?'dek':'ord';render()});
+ if($('#bk2'))$('#bk2').onclick=()=>{cur='';render()};
+ if($('#pp'))$('#pp').onchange=e=>{ct[cur].p=e.target.value;save()};
+ if($('#imp2'))$('#imp2').onclick=()=>openImp(cur);
+ if($('#rn'))$('#rn').onclick=()=>{const n=prompt('Neuer Name',ct[cur].n);if(n&&n.trim()){ct[cur].n=n.trim();save();render()}};
+ if($('#rm2'))$('#rm2').onclick=()=>{if(!confirm('„'+ct[cur].n+'“ samt Karten darin löschen?'))return;for(const k in col)if(col[k].fo===cur)delete col[k];for(const id in ct)if(ct[id].p===cur)ct[id].p='';delete ct[cur];cur='';save();render()};
+}
+function renderLists(){
+ const isF=tab==='ord',items=Object.entries(ct).filter(([,x])=>x.k===(isF?'f':'d')),cn=id=>Object.values(col).filter(e=>e.fo===id);
+ $('#main').innerHTML=`<section><h2>${isF?'Meine Ordner':'Meine Decklisten'}</h2><div class="row">${isF?'<input id="nn" placeholder="Name des neuen Ordners" aria-label="Ordnername"><button class="pri" id="mk">Ordner erstellen</button>':'<button class="pri" id="mkd">Decklist einfügen</button>'}</div><div class="fgrid">${items.map(([id,x])=>{const l=cn(id),v=l.reduce((t,e)=>t+price(e)*e.q,0);return`<div class="fi" data-c="${id}"><b>${esc(x.n)}</b><small>${l.reduce((t,e)=>t+e.q,0)} Karten${v?', '+eur(v):''}${x.k==='d'&&x.p&&ct[x.p]?', in '+esc(ct[x.p].n):''}</small></div>`}).join('')||'<p class="empty">Noch nichts vorhanden.</p>'}</div></section>`;
+ if($('#mk'))$('#mk').onclick=()=>{const n=$('#nn').value.trim();if(!n)return;ct['f'+Date.now().toString(36)]={n,k:'f',p:''};save();render()};
+ if($('#mkd'))$('#mkd').onclick=()=>openImp('new');
+ bindHead();
+}
 function render(){
- const all=Object.values(col).map(x=>({...x.c,n:x.c.d||x.c.n,en:x.c.n,q:x.q,_t:x.t})),qs=$('#q').value.toLowerCase().trim();
- const list=all.filter(c=>(!qs||(c.n+' '+c.en+' '+c.t+' '+c.o).toLowerCase().includes(qs))&&(!act.size||(c.co.length?c.co.some(x=>act.has(x)):act.has('C'))));
- const tot=all.reduce((a,c)=>a+c.q,0),val=all.reduce((a,c)=>a+c.p*c.q,0);
- $('#stats').textContent=all.length?`${tot} Karten, ${all.length} verschiedene, Wert ca. ${eur(val)}${list.length<all.length?` (${list.length} angezeigt)`:''}`:'';
- if(!all.length){$('#main').innerHTML='<div class="empty"><h2>Noch keine Karten</h2><p>Klicke auf „Karten importieren“ und füge deine Kartenliste ein.</p></div>';return}
+ stats();
+ document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
+ const lst=tab!=='sam'&&(!cur||!ct[cur]);if(lst)cur='';
+ $('#bar').style.display=lst?'none':'';
+ if(lst)return renderLists();
+ const sc=tab==='sam'?'':cur,qs=$('#q').value.toLowerCase().trim();
+ const all=Object.entries(col).filter(([,e])=>e.fo===sc).map(([k,e])=>({...e.c,n:e.c.d||e.c.n,en:e.c.n,q:e.q,_t:e.t,k,f:e.f,pr:price(e)}));
+ const flt=(S,fn)=>!S.size||[...S].some(fn);
+ const list=all.filter(c=>(!qs||(c.n+' '+c.en+' '+c.t+' '+c.o).toLowerCase().includes(qs))&&flt(F.col,x=>x==='C'?!c.co.length:c.co.includes(x))&&flt(F.rar,x=>c.r===x)&&flt(F.typ,x=>c.t.includes(x))&&flt(F.fol,x=>x==='foil'?c.f!=='':c.f===''));
+ const tot=all.reduce((a,c)=>a+c.q,0),val=all.reduce((a,c)=>a+c.pr*c.q,0);
+ let head='';
+ if(sc){const o=ct[sc],subs=Object.entries(ct).filter(([,x])=>x.p===sc);
+  head=`<div class="chd"><button id="bk2">‹ Zurück</button><h2 style="flex:1">${esc(o.n)}<small>${tot} Karten, Wert ca. ${eur(val)}</small></h2>${o.k==='d'?`<select id="pp" aria-label="In Ordner"><option value="">Kein Ordner</option>${Object.entries(ct).filter(([,x])=>x.k==='f').map(([id,x])=>`<option value="${id}"${o.p===id?' selected':''}>${esc(x.n)}</option>`).join('')}</select>`:''}<button id="imp2">Karten hinzufügen</button><button id="rn">Umbenennen</button><button id="rm2">Löschen</button></div>${subs.length?`<div class="fgrid">${subs.map(([id,x])=>`<div class="fi" data-c="${id}"><b>${esc(x.n)}</b><small>Decklist</small></div>`).join('')}</div>`:''}`}
+ if(!all.length){$('#main').innerHTML=head+'<div class="empty"><h2>Noch keine Karten</h2><p>Tippe auf „Importieren“ oder „Scannen“, um Karten hinzuzufügen.</p></div>';bindHead();return}
  const g=GR[$('#gr').value],gs=new Map();
  {const f=SO[$('#so').value];list.sort((a,b)=>dir*f(a,b))}
  for(const c of list){const[o,l]=g(c);if(!gs.has(l))gs.set(l,{o,l,a:[]});gs.get(l).a.push(c)}
  const secs=[...gs.values()].sort((a,b)=>a.o-b.o||a.l.localeCompare(b.l));
- $('#main').innerHTML=secs.map(s=>`<section><h2>${esc(s.l)}<small>${s.a.reduce((n,c)=>n+c.q,0)} Karten</small></h2><div class="grid">${s.a.map(c=>`<div class="card" tabindex="0" data-id="${c.id}" title="${esc(c.n)}">${c.i?`<img loading="lazy" src="${small(c.i)}" alt="${esc(c.n)}">`:`<span class="nm">${esc(c.n)}</span>`}${c.q>1?`<b class="q">${c.q}x</b>`:''}<span class="lq">${c.q}x</span><span class="lq">${esc(c.n)}</span><span class="lq">${sym(c.mc)}</span><span class="lq x">${esc(c.t)}</span><span class="lq x">${esc(c.s.toUpperCase())} ${esc(c.cn)}</span><span class="lq">${c.p?eur(c.p):''}</span></div>`).join('')}</div></section>`).join('');
+ $('#main').innerHTML=head+(list.length?secs.map(s=>`<section><h2>${esc(s.l)}<small>${s.a.reduce((n,c)=>n+c.q,0)} Karten</small></h2><div class="grid">${s.a.map(c=>`<div class="card" tabindex="0" data-k="${esc(c.k)}" title="${esc(c.n)}">${c.i?`<img loading="lazy" src="${small(c.i)}" alt="${esc(c.n)}">`:`<span class="nm">${esc(c.n)}</span>`}${c.q>1?`<b class="q">${c.q}x</b>`:''}${c.f?`<i class="fo">${FL[c.f]}</i>`:''}${c.pr?`<i class="pb">${eur(c.pr)}</i>`:''}<span class="lq">${c.q}x</span><span class="lq">${esc(c.n)}</span><span class="lq">${sym(c.mc)}</span><span class="lq x">${esc(c.t)}</span><span class="lq x">${esc(c.s.toUpperCase())} ${esc(c.cn)}${c.f?' ★'+FL[c.f]:''}</span><span class="lq">${c.pr?eur(c.pr):''}</span></div>`).join('')}</div></section>`).join(''):'<div class="empty"><p>Keine Karte passt zu den Filtern.</p></div>');
+ bindHead();
 }
 
-function detail(id,back){
- const x=col[id];if(!x){$('#det').close();return}
- const c=x.c;cur=id;
- $('#det').innerHTML=`<div class="dl"><img src="${back&&c.i2?c.i2:c.i}" alt="${esc(c.n)}"><div><h2>${esc(c.d||c.n)}</h2>${c.d?`<div style="color:var(--mu)">${esc(c.n)}</div>`:''}<div>${sym(c.mc)}</div><p>${esc(c.t)}\n${esc(c.o)}</p><p>${esc(c.sn)} (${esc(c.s.toUpperCase())}) ${esc(c.cn)}, ${esc(c.r)}${c.p?', '+eur(c.p):''}</p>
- <div class="row"><button id="mi" aria-label="Eine weniger">−</button><b>${x.q}x</b><button id="pl" aria-label="Eine mehr">+</button>${c.i2?`<button id="fl">Rückseite</button>`:''}</div>
- <div class="row"><button id="rm">Aus Sammlung entfernen</button><button id="cx">Schließen</button></div></div></div>`;
- if(!$('#det').open)$('#det').showModal();
- $('#mi').onclick=()=>{x.q>1?x.q--:delete col[id];save();render();detail(id,back)};
- $('#pl').onclick=()=>{x.q++;save();render();detail(id,back)};
- $('#rm').onclick=()=>{delete col[id];save();render();$('#det').close()};
- $('#cx').onclick=()=>$('#det').close();
- if(c.i2)$('#fl').onclick=()=>detail(id,!back);
+const fOpts=(c,sel)=>{const fin=c.finishes||c.fin||[],a=fin.length?fin.map(f=>f==='nonfoil'?'':f):['','foil','etched'],d=a.includes(sel)?sel:a[0];return a.map(f=>`<option value="${f}"${f===d?' selected':''}>${FL[f]}</option>`).join('')};
+async function detPrints(k,back){
+ const x=col[k],sel=$('#dpr');if(!x)return;
+ try{
+  const u=x.c.oi?'https://api.scryfall.com/cards/search?order=released&unique=prints&q='+encodeURIComponent('oracleid:'+x.c.oi):(await(await fetch('https://api.scryfall.com/cards/'+x.c.id)).json()).prints_search_uri;
+  const L=(await(await fetch(u)).json()).data||[];
+  if(col[k]!==x)return;
+  sel.innerHTML=L.map((y,i)=>`<option value="${i}"${y.id===x.c.id?' selected':''}>${esc(y.set_name)} (${esc(y.set.toUpperCase())}) #${esc(y.collector_number)}${(y.promo_types||[]).length?' – '+esc(y.promo_types.join(', ')):''}</option>`).join('');
+  sel.onchange=()=>{const y=slim(L[+sel.value]);let f=x.f;if(y.fin.length&&!y.fin.includes(f===''?'nonfoil':f))f=y.fin.includes('nonfoil')?'':y.fin[0];detail(move(k,{c:y,f}),back)};
+ }catch(e){}
 }
-$('#main').onclick=e=>{const k=e.target.closest('.card');if(k)detail(k.dataset.id)};
-$('#main').onkeydown=e=>{if(e.key==='Enter'){const k=e.target.closest('.card');if(k)detail(k.dataset.id)}};
+function detail(k,back){
+ const x=col[k];if(!x){$('#det').close();return}
+ const c=x.c,p=price(x);
+ $('#det').innerHTML=`<div class="dl"><img src="${back&&c.i2?c.i2:c.i}" alt="${esc(c.n)}"><div><h2>${esc(c.d||c.n)}</h2>${c.d?`<div style="color:var(--mu)">${esc(c.n)}</div>`:''}<div>${sym(c.mc)}</div><p>${esc(c.t)}\n${esc(c.o)}</p>
+ <label class="fld">Edition<select id="dpr" class="sl"><option>${esc(c.sn)} (${esc(c.s.toUpperCase())}) #${esc(c.cn)}</option></select></label>
+ <label class="fld">Ausführung<select id="dfo" class="sl">${fOpts(c,x.f)}</select></label>
+ <label class="fld">Ordner<select id="dfl" class="sl"><option value="">Sammlung</option>${Object.entries(ct).map(([id,o])=>`<option value="${id}"${id===x.fo?' selected':''}>${esc(o.n)}${o.k==='d'?' (Deck)':''}</option>`).join('')}</select></label>
+ <p>${p?eur(p)+' pro Karte, '+x.q+'x = '+eur(p*x.q):'Kein Preis verfügbar (Preise über „Mehr“ aktualisieren)'}</p>
+ <div class="row"><button id="mi" aria-label="Eine weniger">−</button><b>${x.q}x</b><button id="pl" aria-label="Eine mehr">+</button>${c.i2?'<button id="fl">Rückseite</button>':''}</div>
+ <div class="row"><button id="rm">Entfernen</button><button id="cx">Schließen</button></div></div></div>`;
+ if(!$('#det').open)$('#det').showModal();
+ $('#mi').onclick=()=>{x.q>1?x.q--:delete col[k];save();render();detail(k,back)};
+ $('#pl').onclick=()=>{x.q++;save();render();detail(k,back)};
+ $('#rm').onclick=()=>{delete col[k];save();render();$('#det').close()};
+ $('#cx').onclick=()=>$('#det').close();
+ if(c.i2)$('#fl').onclick=()=>detail(k,!back);
+ $('#dfo').onchange=e=>detail(move(k,{f:e.target.value}),back);
+ $('#dfl').onchange=e=>detail(move(k,{fo:e.target.value}),back);
+ detPrints(k,back);
+}
+$('#main').onclick=e=>{const k=e.target.closest('.card');if(k)detail(k.dataset.k)};
+$('#main').onkeydown=e=>{if(e.key==='Enter'){const k=e.target.closest('.card');if(k)detail(k.dataset.k)}};
 for(const d of ['#det','#imp'])$(d).addEventListener('click',e=>{if(e.target===$(d))$(d).close()});
 
 // Import
 function csvSplit(l,d){const r=[];let s='',q=false;for(const ch of l){if(ch==='"')q=!q;else if(ch===d&&!q){r.push(s);s=''}else s+=ch}r.push(s);return r.map(x=>x.trim())}
 function parse(txt){
- const out=new Map(),add=e=>{const k=e.sid||(e.set&&e.num?e.set+'/'+e.num:e.name.toLowerCase()),o=out.get(k);o?o.q+=e.q:out.set(k,e)};
+ const out=new Map(),add=e=>{const k=(e.sid||(e.set&&e.num?e.set+'/'+e.num:e.name.toLowerCase()))+'|'+(e.f||''),o=out.get(k);o?o.q+=e.q:out.set(k,e)};
  const lines=txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean),h=(lines[0]||'').toLowerCase();
  if(/[,;\t]/.test(h)&&/(^|[,;\t"])name([,;\t"]|$)/.test(h)){
   const d=[',',';','\t'].sort((a,b)=>h.split(b).length-h.split(a).length)[0],H=csvSplit(h,d),ix=r=>H.findIndex(x=>r.test(x));
-  const iN=ix(/^name$/),iQ=ix(/quantity|count|qty|anzahl/),iS=ix(/scryfall id/),iSet=ix(/set code|^set$|edition code/),iNum=ix(/collector number|^number$/);
-  for(const l of lines.slice(1)){const c=csvSplit(l,d);if(!c[iN])continue;add({q:parseInt(c[iQ])||1,name:c[iN],sid:iS>=0&&c[iS]||undefined,set:iSet>=0&&c[iSet]?c[iSet].toLowerCase():undefined,num:iNum>=0&&c[iNum]||undefined})}
+  const iN=ix(/^name$/),iQ=ix(/quantity|count|qty|anzahl/),iS=ix(/scryfall id/),iSet=ix(/set code|^set$|edition code/),iNum=ix(/collector number|^number$/),iF=ix(/^foil$/);
+  for(const l of lines.slice(1)){const c=csvSplit(l,d);if(!c[iN])continue;add({q:parseInt(c[iQ])||1,f:iF>=0?(/etched/i.test(c[iF])?'etched':/^(foil|true|yes)$/i.test(c[iF])?'foil':''):'',name:c[iN],sid:iS>=0&&c[iS]||undefined,set:iSet>=0&&c[iSet]?c[iSet].toLowerCase():undefined,num:iNum>=0&&c[iNum]||undefined})}
   return out}
  for(let l of lines){
   if(/^(\/\/|#)/.test(l)||/^(deck|sideboard|commander|companion|maybeboard|mainboard)\s*:?$/i.test(l))continue;
   l=l.replace(/^SB:\s*/i,'');
-  const m=l.match(/^(?:(\d+)\s*[xX]?\s+)?(.+?)(?:\s+\(([A-Za-z0-9]{2,6})\)(?:\s+([\w★-]+))?)?(?:\s+\*[FEfe]\*)?$/);
-  if(m)add({q:+m[1]||1,name:m[2].trim(),set:m[3]&&m[3].toLowerCase(),num:m[4]});
+  const m=l.match(/^(?:(\d+)\s*[xX]?\s+)?(.+?)(?:\s+\(([A-Za-z0-9]{2,6})\)(?:\s+([\w★-]+))?)?(?:\s+\*([FEfe])\*)?$/);
+  if(m)add({q:+m[1]||1,name:m[2].trim(),set:m[3]&&m[3].toLowerCase(),num:m[4],f:m[5]?(m[5].toLowerCase()==='e'?'etched':'foil'):''});
  }
  return out;
 }
@@ -224,15 +291,21 @@ async function lookup(es,prog){
  }
  return{res,bad};
 }
-$('#open').onclick=()=>$('#imp').showModal();
+function openImp(t){
+ $('#tgt').innerHTML='<option value="">Sammlung</option>'+Object.entries(ct).map(([id,o])=>`<option value="${id}">${esc(o.n)}${o.k==='d'?' (Decklist)':''}</option>`).join('')+'<option value="new">➕ Neue Decklist …</option>';
+ $('#tgt').value=t||'';$('#dn').style.display=$('#tgt').value==='new'?'':'none';$('#imp').showModal()}
+$('#tgt').onchange=()=>$('#dn').style.display=$('#tgt').value==='new'?'':'none';
+$('#open').onclick=()=>openImp(tab==='sam'?'':cur);
 $('#cl').onclick=()=>$('#imp').close();
 $('#go').onclick=async()=>{
  const es=[...parse($('#txt').value).values()],st=$('#st');
  if(!es.length){st.textContent='Keine Karten erkannt. Bitte eine Karte pro Zeile einfügen.';return}
  $('#go').disabled=true;st.textContent='Lade Kartendaten …';
  const{res,bad}=await lookup(es,(a,b,m)=>st.textContent=`${m?'Suche deutsche und unscharfe Namen':'Lade Kartendaten'} ${a}/${b} …`);
- if(res.length&&$('#rep').checked)col={};
- for(const[e,c]of res){const x=col[c.id];x?x.q+=e.q:col[c.id]={c:slim(c),q:e.q,t:Date.now()}}
+ let fo=$('#tgt').value;
+ if(res.length&&fo==='new'){fo='d'+Date.now().toString(36);ct[fo]={n:$('#dn').value.trim()||'Neue Decklist',k:'d',p:''};tab='dek';cur=fo}
+ if(res.length&&$('#rep').checked)for(const k in col)if(col[k].fo===fo)delete col[k];
+ for(const[e,c]of res)put(c,e.q,dflt(c,e.f),fo);
  save();render();$('#go').disabled=false;
  st.textContent=`${res.length} von ${es.length} Einträgen hinzugefügt.`+(bad.length?`\nNicht gefunden (oder keine Verbindung zu Scryfall):\n${bad.map(e=>e.name).join('\n')}`:'');
  if(!bad.length)$('#txt').value='';
@@ -240,12 +313,16 @@ $('#go').onclick=async()=>{
 
 // Backup, Text, Filter
 function dl(name,data){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=name;a.click()}
-$('#bk').onclick=()=>dl('magic-sammlung-backup.json',JSON.stringify(col));
+$('#bk').onclick=()=>dl('magic-sammlung-backup.json',JSON.stringify({v:2,col,ct}));
 $('#ld').onclick=()=>$('#file').click();
-$('#file').onchange=async e=>{try{const o=JSON.parse(await e.target.files[0].text());if(typeof o!=='object')throw 0;col=o;save();render()}catch(x){alert('Datei konnte nicht gelesen werden.')}e.target.value=''};
-$('#cp').onclick=async()=>{const t=Object.values(col).map(x=>`${x.q} ${x.c.n} (${x.c.s.toUpperCase()}) ${x.c.cn}`).sort().join('\n');try{await navigator.clipboard.writeText(t);$('#cp').textContent='Kopiert'}catch(e){prompt('Text kopieren:',t)}setTimeout(()=>$('#cp').textContent='Als Text kopieren',1500)};
-$('#chips').innerHTML=['W','U','B','R','G','C'].map(k=>`<button class="chip m${k}" aria-pressed="false" data-k="${k}" title="${CN[k==='C'?'C':k]}">${k}</button>`).join('');
-$('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;const k=b.dataset.k;act.has(k)?act.delete(k):act.add(k);b.setAttribute('aria-pressed',act.has(k));render()};
+$('#file').onchange=async e=>{try{const o=JSON.parse(await e.target.files[0].text());if(typeof o!=='object')throw 0;col=migrate(o.v===2?o.col:o);ct=o.v===2?(o.ct||{}):{};save();render()}catch(x){alert('Datei konnte nicht gelesen werden.')}e.target.value=''};
+$('#cp').onclick=async()=>{const t=Object.values(col).filter(x=>x.fo===(tab==='sam'?'':cur)).map(x=>`${x.q} ${x.c.n} (${x.c.s.toUpperCase()}) ${x.c.cn}${x.f?' *'+(x.f==='etched'?'E':'F')+'*':''}`).sort().join('\n');try{await navigator.clipboard.writeText(t);$('#cp').textContent='Kopiert'}catch(e){prompt('Text kopieren:',t)}setTimeout(()=>$('#cp').textContent='Als Text kopieren',1500)};
+const FD=[...['W','U','B','R','G','C'].map(k=>['col',k,k,CN[k],'m'+k]),...[['common','Gew.'],['uncommon','Ung.'],['rare','Selten'],['mythic','Mythisch']].map(([k,l])=>['rar',k,l,l,'t']),...[['Creature','Kreatur'],['Instant','Instant'],['Sorcery','Hexerei'],['Enchantment','Verzauberung'],['Artifact','Artefakt'],['Planeswalker','Planeswalker'],['Land','Land']].map(([k,l])=>['typ',k,l,l,'t']),['fol','foil','Foil','Foil','t'],['fol','plain','Nicht foil','Nicht foil','t']];
+$('#chips').innerHTML=FD.map(([g,k,l,t,c])=>`<button class="chip ${c}" data-g="${g}" data-k="${k}" aria-pressed="false" title="${t}">${l}</button>`).join('')+'<button class="chip t" id="fx" title="Alle Filter löschen">✕ Filter</button>';
+$('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;
+ if(b.id==='fx'){for(const g in F)F[g].clear();document.querySelectorAll('#chips [data-g]').forEach(x=>x.setAttribute('aria-pressed','false'))}
+ else{const S=F[b.dataset.g],k=b.dataset.k;S.has(k)?S.delete(k):S.add(k);b.setAttribute('aria-pressed',S.has(k))}
+ render()};
 $('#vw').onclick=()=>{const l=document.body.classList.toggle('list');$('#vw').textContent=l?'Bildansicht':'Listenansicht'};
 const dlab=()=>$('#dr').textContent=dir>0?'↑ aufsteigend':'↓ absteigend';
 $('#so').addEventListener('input',()=>{dir=['preis','neu'].includes($('#so').value)?-1:1;dlab()});
@@ -260,21 +337,22 @@ async function findOne(n){
  try{return await js('https://api.scryfall.com/cards/named?fuzzy='+encodeURIComponent(n))}catch(e){}
  for(const q of[`lang:de !"${n}"`,`lang:de "${n}"`]){try{const d=await js('https://api.scryfall.com/cards/search?unique=prints&q='+encodeURIComponent(q));if(d.data.length)return d.data[0]}catch(e){}}
  return null}
+let starSeen=false;
 function showCard(c){
- found=c;const f=(c.card_faces||[])[0]||{},im=(c.image_uris||f.image_uris||{}).small||'';
- $('#sres').innerHTML=`<img src="${im}" alt=""><div style="flex:1"><b>${esc(c.printed_name||f.printed_name||c.name)}</b><br><small>${esc(c.set_name)}</small></div><button class="pri" id="sadd">Hinzufügen</button><button id="sno">Weiter</button>`;
- $('#sadd').onclick=addFound;
- $('#sno').onclick=()=>{lastAuto=found.id;found=null;$('#sres').innerHTML='';sst('Nächste Karte vor die Kamera halten.')};
+ found=c;const f=(c.card_faces||[])[0]||{},im=(c.image_uris||f.image_uris||{}).small||'',pe=c.prices&&c.prices.eur;
+ $('#sres').innerHTML=`<img src="${im}" alt=""><div style="flex:1;min-width:150px"><b>${esc(c.printed_name||f.printed_name||c.name)}</b><br><small id="sset">${esc(c.set_name)} (${esc(c.set.toUpperCase())}) #${esc(c.collector_number)}</small><select id="spr" class="sl" aria-label="Edition wählen"><option>Editionen laden …</option></select><select id="sfo" class="sl" aria-label="Ausführung">${fOpts(c,starSeen?'foil':'')}</select></div><button class="pri" id="sadd">Hinzufügen</button><button id="sno">Weiter</button>`;
+ $('#sadd').onclick=addFound;loadPrints(c);
+ $('#sno').onclick=()=>{lastAuto=found.oracle_id||found.name;found=null;$('#sres').innerHTML='';sst('Nächste Karte vor die Kamera halten.')};
 }
 function addFound(){
- const c=found,x=col[c.id];x?x.q++:col[c.id]={c:slim(c),q:1,t:Date.now()};
- save();render();cnt++;lastAuto=c.id;found=null;$('#sres').innerHTML='';$('#sname').value='';
- sst(`✓ Hinzugefügt (${cnt} in dieser Sitzung). Nächste Karte vor die Kamera halten.`);if(!stream)$('#sfile').click();
+ const c=found,f=($('#sfo')||{}).value||'',fo=(tab!=='sam'&&cur)||'';
+ put(c,1,f,fo);save();render();cnt++;lastAuto=c.oracle_id||c.name;found=null;$('#sres').innerHTML='';$('#sname').value='';
+ sst(`✓ Hinzugefügt${f?' ('+FL[f]+')':''}, ${cnt} in dieser Sitzung. Nächste Karte vor die Kamera halten.`);if(!stream)$('#sfile').click();
 }
-async function search(n){
- sst('Suche „'+n+'“ …');const c=await findOne(n.replace(/"/g,''));
+async function search(n,r){
+ sst('Suche „'+n+'“ …');let c=await findOne(n.replace(/"/g,''));
  if(!c){$('#sres').innerHTML='';sst('Nichts gefunden. Name korrigieren und „Suchen“ tippen.');return}
- showCard(c);sst('Stimmt die Karte? Dann „Hinzufügen“.');
+ if(r)c=await pick(c,...r);showCard(c);sst('Stimmt die Karte? Edition prüfen, dann „Hinzufügen“.');
 }
 function crop(src,w,h,still){
  const gh=still?h:h*.8,gw=still?w:gh*488/680,x0=(w-gw)/2,y0=still?0:h*.1;
@@ -285,14 +363,40 @@ function sharp(cv){ // Varianz des Laplace-Filters: hoch = scharf
  g.drawImage(cv,0,0,w,h);const d=g.getImageData(0,0,w,h).data,v=[];
  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;v.push(4*d[i]-d[i-4]-d[i+4]-d[i-w*4]-d[i+w*4])}
  const m=v.reduce((a,b)=>a+b,0)/v.length;return v.reduce((a,b)=>a+(b-m)*(b-m),0)/v.length}
-async function ocr(cv){
+async function ocr(cv,raw){
  try{await loadT();if(!worker)worker=await Tesseract.createWorker('eng+deu')}catch(e){sst('Texterkennung konnte nicht geladen werden (Internet?).');return null}
- return(await worker.recognize(cv)).data.text.replace(/[^A-Za-zÀ-ÿ,' \-]/g,' ').replace(/\s+/g,' ').trim()}
+ const r=(await worker.recognize(cv)).data.text;return raw?r.toUpperCase():r.replace(/[^A-Za-zÀ-ÿ,' \-]/g,' ').replace(/\s+/g,' ').trim()}
 async function readTitle(src,w,h,still){
  sst('Erkenne Text … (beim ersten Mal wird die Texterkennung geladen)');
  const t=await ocr(crop(src,w,h,still));if(t===null)return;
- $('#sname').value=t;t.length<3?sst('Kein Name erkannt. Karte näher und gerader halten oder den Namen eintippen.'):await search(t);
+ $('#sname').value=t;t.length<3?sst('Kein Name erkannt. Karte näher und gerader halten oder den Namen eintippen.'):await search(t,[src,w,h,still]);
 }
+function cropB(src,w,h,still){ // unten links auf der Karte: Set-Kürzel, Sammlernummer, Sprache
+ const gh=still?h:h*.8,gw=still?w:gh*488/680,x0=(w-gw)/2,y0=still?0:h*.1;
+ const sx=x0+gw*.03,sw=gw*.5,sy=y0+gh*.91,sh=gh*.075,k=Math.min(4,Math.max(1,900/sw)),cv=document.createElement('canvas'),g=cv.getContext('2d');
+ cv.width=sw*k;cv.height=sh*k;g.filter='grayscale(1) contrast(1.8)';g.drawImage(src,sx,sy,sw,sh,0,0,cv.width,cv.height);return cv}
+async function pick(c,src,w,h,still){ // genaues Printing über Set und Nummer finden
+ try{
+  const t=await ocr(cropB(src,w,h,still),true)||'',
+   star=(starSeen=/★/.test(t)),num=(t.match(/(\d{1,4})\s*\/\s*\d{1,4}/)||t.match(/\b0*(\d{1,4})\b/)||[])[1],
+   m=t.match(/\b([A-Z][A-Z0-9]{2,4})\s*[•·.*—-]?\s*(EN|DE|FR|ES|IT|PT|JA|KO|RU|ZH|PH)\b/);
+  if(num&&m){
+   const set=m[1].toLowerCase(),n=String(parseInt(num,10));
+   for(const u of [`${set}/${n}/${m[2].toLowerCase()}`,`${set}/${n}`]){
+    try{const r=await fetch('https://api.scryfall.com/cards/'+u);if(r.ok){const d=await r.json();if(d.oracle_id===c.oracle_id||d.name===c.name)return d}}catch(e){}
+   }
+  }
+ }catch(e){}
+ return c}
+async function loadPrints(c){ // alle Editionen der Karte zur Auswahl
+ const sel=$('#spr');if(!sel||!c.prints_search_uri)return;
+ try{
+  const d=await(await fetch(c.prints_search_uri)).json(),L=d.data||[];
+  if(!L.some(x=>x.id===c.id))L.unshift(c);
+  if(found!==c)return;
+  sel.innerHTML=L.map((x,i)=>`<option value="${i}"${x.id===c.id?' selected':''}>${esc(x.set_name)} (${esc(x.set.toUpperCase())}) #${esc(x.collector_number)}${(x.promo_types||[]).length?' – '+esc(x.promo_types.join(', ')):''}${x.lang!=='en'?' '+x.lang.toUpperCase():''}, ${esc((x.released_at||'').slice(0,4))}</option>`).join('');
+  sel.onchange=()=>{const x=L[+sel.value];found=x;$('#sfo').innerHTML=fOpts(x,'');$('#sset').textContent=`${x.set_name} (${x.set.toUpperCase()}) #${x.collector_number}`;const im=(x.image_uris||((x.card_faces||[])[0]||{}).image_uris||{}).small;if(im)$('#sres img').src=im};
+ }catch(e){sel.innerHTML='<option>Editionen nicht ladbar</option>'}}
 let auto=0,lastAuto=null;const SHARP=80;
 let zc=null,zL=[],zI=0,zS={},zHold=0,fails=0;
 async function setZ(v){try{await stream.getVideoTracks()[0].applyConstraints({advanced:[{zoom:v}]})}catch(e){}}
@@ -320,8 +424,8 @@ async function autoLoop(){ // erkennt Karten fortlaufend, ohne Button
     if(t&&t.length>=3){
      const c=await findOne(t.replace(/"/g,'')),nm=c?[c.name,c.printed_name,...(c.card_faces||[]).map(f=>f.printed_name||f.name)].filter(Boolean):[];
      if(c&&nm.some(x=>sim(t,x)>=.7)){ok=true;fails=0;
-      if(c.id===lastAuto)sst('Diese Karte ist schon verarbeitet. Nächste Karte vor die Kamera halten.');
-      else{$('#sname').value=t;showCard(c);if($('#aa').checked)addFound();else sst('Karte erkannt. Mit „Hinzufügen“ bestätigen.')}
+      if((c.oracle_id||c.name)===lastAuto)sst('Diese Karte ist schon verarbeitet. Nächste Karte vor die Kamera halten.');
+      else{$('#sname').value=t;showCard(await pick(c,v,v.videoWidth,v.videoHeight,false));if($('#aa').checked)addFound();else sst('Karte erkannt. Mit „Hinzufügen“ bestätigen.')}
      }else{lastAuto=null;if(++fails>=3){fails=0;zS={};await autoZoom(s)}sst(`Gelesen: „${t}“. Passt zu keiner Karte. Ruhiger halten oder unten den Namen eintippen.`)}
     }else{lastAuto=null;sst('Karte in den Rahmen halten, sie wird automatisch erkannt.')}
    }
@@ -344,5 +448,17 @@ $('#sfile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
 $('#sfind').onclick=()=>{const n=$('#sname').value.trim();n&&search(n)};
 $('#sname').onkeydown=e=>{if(e.key==='Enter')$('#sfind').click()};
 $('#tg').onclick=()=>$('#opts').classList.toggle('on');
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;cur='';render()});
+async function refresh(){
+ const ids=[...new Set(Object.values(col).map(e=>e.c.id))],b=$('#pr');
+ for(let i=0;i<ids.length;i+=75){
+  b.textContent=`Aktualisiere ${Math.min(i+75,ids.length)}/${ids.length} …`;
+  try{const r=await fetch('https://api.scryfall.com/cards/collection',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({identifiers:ids.slice(i,i+75).map(id=>({id}))})});
+   for(const c of (await r.json()).data){const n=slim(c);for(const e of Object.values(col))if(e.c.id===c.id)e.c=n}}catch(x){}
+  await wait(120);
+ }
+ save();render();b.textContent='Preise aktualisieren';
+}
+$('#pr').onclick=refresh;
 render();
 </script></body></html>
