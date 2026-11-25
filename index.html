@@ -76,7 +76,8 @@ dialog{width:100vw;max-width:100vw;max-height:100dvh;border-radius:0;border:0}
 .chips{flex-wrap:wrap}.chip.t{width:auto;border-radius:15px;padding:0 10px;font-size:12px;font-weight:600;background:var(--pn);color:var(--tx)}#fx{opacity:1}
 .pb{position:absolute;left:4px;bottom:4px;background:#000b;color:#fff;font:600 11px "Segoe UI",sans-serif;padding:1px 6px;border-radius:8px;font-style:normal}
 .fo{position:absolute;left:4px;top:4px;background:linear-gradient(90deg,#f7a,#7af,#af7);color:#111;font:700 10px "Segoe UI",sans-serif;padding:1px 6px;border-radius:8px;font-style:normal}
-.list .card .pb,.list .card .fo{display:none}
+.list .card .pb,.list .card .fo,.list .card .lgb{display:none}
+.lgb{position:absolute;right:4px;bottom:4px;background:#000b;color:#fff;font:700 10px "Segoe UI",sans-serif;padding:1px 6px;border-radius:8px;font-style:normal}
 .fi{background:var(--pn);border:1px solid var(--ln);border-radius:8px;padding:12px 14px;cursor:pointer;display:grid;gap:3px}.fi:hover{border-color:var(--ac)}.fi small{color:var(--mu)}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:12px 0}
 .chd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 0 4px}.chd h2{border:0;margin:0;padding:0}
@@ -88,7 +89,7 @@ dialog{width:100vw;max-width:100vw;max-height:100dvh;border-radius:0;border:0}
 <header>
 <h1>Meine Sammlung</h1><div id="stats"></div>
 <div class="acts"><button class="pri" id="sc">Scannen</button><button id="open">Importieren</button><button id="tg">Filter</button></div>
-<details class="more"><summary>Mehr</summary><div><button id="bk">Backup speichern</button><button id="ld">Backup laden</button><button id="cp">Als Text kopieren</button><button id="pr">Preise aktualisieren</button></div></details><input type="file" id="file" accept=".json" hidden>
+<details class="more"><summary>Mehr</summary><div><button id="bk">Backup speichern</button><button id="ld">Backup laden</button><button id="cp">Als Text kopieren</button><button id="pr">Preise aktualisieren</button><label class="fld">Sprache<select id="lg" class="sl" translate="no"><option value="de">Deutsch</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option></select></label></div></details><input type="file" id="file" accept=".json" hidden>
 </header>
 <nav id="tabs"><button data-t="sam">Sammlung</button><button data-t="ord">Ordner</button><button data-t="dek">Decklisten</button></nav>
 <div class="bar" id="bar">
@@ -133,7 +134,7 @@ function put(c,q,f,fo){const k=K(c.id,f,fo),x=col[k];x?x.q+=q:col[k]={c:slim(c),
 function dflt(c,f){const fin=c.finishes||[];return f&&(fin.includes(f)||!fin.length)?f:(fin.length&&!fin.includes('nonfoil')?fin[0]:'')}
 function move(k,ch){const x=col[k];delete col[k];const f=ch.f!==undefined?ch.f:x.f,fo=ch.fo!==undefined?ch.fo:x.fo,c=ch.c||x.c,nk=K(c.id,f,fo),y=col[nk];y?y.q+=x.q:col[nk]={...x,c,f,fo};save();render();return nk}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const eur=n=>n.toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+const eur=n=>n.toLocaleString(({de:'de-DE',en:'en-IE',fr:'fr-FR',es:'es-ES'})[ui]||'de-DE',{style:'currency',currency:'EUR'});
 const CN={W:'Weiß',U:'Blau',B:'Schwarz',R:'Rot',G:'Grün',M:'Mehrfarbig',C:'Farblos',L:'Länder'},ORD=['W','U','B','R','G','M','C','L'];
 const isLand=c=>/\bLand\b/.test(c.t);
 const ck=c=>isLand(c)?'L':c.co.length>1?'M':c.co.length?c.co[0]:'C';
@@ -162,7 +163,7 @@ const small=u=>u.replace('/normal/','/small/');
 function slim(c){
  const f=(c.card_faces||[])[0]||{},im=c.image_uris||f.image_uris||{},b=(c.card_faces||[])[1];
  return{id:c.id,n:c.name,d:c.printed_name||f.printed_name||'',mc:c.mana_cost||f.mana_cost||'',cmc:c.cmc||0,co:c.colors||f.colors||[],t:c.type_line,r:c.rarity,s:c.set,sn:c.set_name,cn:c.collector_number,
- i:im.normal||'',i2:!c.image_uris&&b&&b.image_uris?b.image_uris.normal:'',p:parseFloat((c.prices||{}).eur)||0,pf:parseFloat((c.prices||{}).eur_foil)||0,pe:parseFloat((c.prices||{}).eur_etched)||0,fin:c.finishes||[],pm:c.promo_types||[],oi:c.oracle_id||'',o:c.printed_text||f.printed_text||c.oracle_text||f.oracle_text||''};
+ i:im.normal||'',i2:!c.image_uris&&b&&b.image_uris?b.image_uris.normal:'',p:parseFloat((c.prices||{}).eur)||0,pf:parseFloat((c.prices||{}).eur_foil)||0,pe:parseFloat((c.prices||{}).eur_etched)||0,fin:c.finishes||[],lg:c.lang||'',pm:c.promo_types||[],oi:c.oracle_id||'',o:c.printed_text||f.printed_text||c.oracle_text||f.oracle_text||''};
 }
 
 function stats(){
@@ -191,7 +192,7 @@ function render(){
  $('#bar').style.display=lst?'none':'';
  if(lst)return renderLists();
  const sc=tab==='sam'?'':cur,qs=$('#q').value.toLowerCase().trim();
- const all=Object.entries(col).filter(([,e])=>e.fo===sc).map(([k,e])=>({...e.c,n:e.c.d||e.c.n,en:e.c.n,q:e.q,_t:e.t,k,f:e.f,pr:price(e)}));
+ const all=Object.entries(col).filter(([,e])=>e.fo===sc).map(([k,e])=>({...e.c,n:e.c.d||e.c.n,en:e.c.n,q:e.q,_t:e.t,k,f:e.f,pr:price(e),lang:e.c.lg||(e.c.d?'de':'en')}));
  const flt=(S,fn)=>!S.size||[...S].some(fn);
  const list=all.filter(c=>(!qs||(c.n+' '+c.en+' '+c.t+' '+c.o).toLowerCase().includes(qs))&&flt(F.col,x=>x==='C'?!c.co.length:c.co.includes(x))&&flt(F.rar,x=>c.r===x)&&flt(F.typ,x=>c.t.includes(x))&&flt(F.fol,x=>x==='foil'?c.f!=='':c.f===''));
  const tot=all.reduce((a,c)=>a+c.q,0),val=all.reduce((a,c)=>a+c.pr*c.q,0);
@@ -203,11 +204,26 @@ function render(){
  {const f=SO[$('#so').value];list.sort((a,b)=>dir*f(a,b))}
  for(const c of list){const[o,l]=g(c);if(!gs.has(l))gs.set(l,{o,l,a:[]});gs.get(l).a.push(c)}
  const secs=[...gs.values()].sort((a,b)=>a.o-b.o||a.l.localeCompare(b.l));
- $('#main').innerHTML=head+(list.length?secs.map(s=>`<section><h2>${esc(s.l)}<small>${s.a.reduce((n,c)=>n+c.q,0)} Karten</small></h2><div class="grid">${s.a.map(c=>`<div class="card" tabindex="0" data-k="${esc(c.k)}" title="${esc(c.n)}">${c.i?`<img loading="lazy" src="${small(c.i)}" alt="${esc(c.n)}">`:`<span class="nm">${esc(c.n)}</span>`}${c.q>1?`<b class="q">${c.q}x</b>`:''}${c.f?`<i class="fo">${FL[c.f]}</i>`:''}${c.pr?`<i class="pb">${eur(c.pr)}</i>`:''}<span class="lq">${c.q}x</span><span class="lq">${esc(c.n)}</span><span class="lq">${sym(c.mc)}</span><span class="lq x">${esc(c.t)}</span><span class="lq x">${esc(c.s.toUpperCase())} ${esc(c.cn)}${c.f?' ★'+FL[c.f]:''}</span><span class="lq">${c.pr?eur(c.pr):''}</span></div>`).join('')}</div></section>`).join(''):'<div class="empty"><p>Keine Karte passt zu den Filtern.</p></div>');
+ $('#main').innerHTML=head+(list.length?secs.map(s=>`<section><h2>${esc(s.l)}<small>${s.a.reduce((n,c)=>n+c.q,0)} Karten</small></h2><div class="grid">${s.a.map(c=>`<div class="card" tabindex="0" data-k="${esc(c.k)}" title="${esc(c.n)}">${c.i?`<img loading="lazy" src="${small(c.i)}" alt="${esc(c.n)}">`:`<span class="nm">${esc(c.n)}</span>`}${c.q>1?`<b class="q">${c.q}x</b>`:''}${c.f?`<i class="fo">${FL[c.f]}</i>`:''}${c.lang!=='en'?`<i class="lgb">${c.lang.toUpperCase()}</i>`:''}${c.pr?`<i class="pb">${eur(c.pr)}</i>`:''}<span class="lq">${c.q}x</span><span class="lq" translate="no">${esc(c.n)}</span><span class="lq">${sym(c.mc)}</span><span class="lq x">${esc(c.t)}</span><span class="lq x">${esc(c.s.toUpperCase())} ${esc(c.cn)}${c.lang!=='en'?' '+c.lang.toUpperCase():''}${c.f?' ★'+FL[c.f]:''}</span><span class="lq">${c.pr?eur(c.pr):''}</span></div>`).join('')}</div></section>`).join(''):'<div class="empty"><p>Keine Karte passt zu den Filtern.</p></div>');
  bindHead();
 }
 
 const fOpts=(c,sel)=>{const fin=c.finishes||c.fin||[],a=fin.length?fin.map(f=>f==='nonfoil'?'':f):['','foil','etched'],d=a.includes(sel)?sel:a[0];return a.map(f=>`<option value="${f}"${f===d?' selected':''}>${FL[f]}</option>`).join('')};
+const LN={en:'English',de:'Deutsch',fr:'Français',es:'Español',it:'Italiano',pt:'Português',ja:'日本語',ko:'한국어',ru:'Русский',zhs:'简体中文',zht:'繁體中文',ph:'Phyrexian'};
+function moveOne(k,ch){ // Sprache gilt für ein Exemplar, so kann dieselbe Karte in mehreren Sprachen vorliegen
+ const x=col[k],y=ch.c;let f=x.f;
+ if(y.fin.length&&!y.fin.includes(f===''?'nonfoil':f))f=y.fin.includes('nonfoil')?'':y.fin[0];
+ if(x.q>1){x.q--;const nk=K(y.id,f,x.fo),z=col[nk];z?z.q++:col[nk]={...x,c:y,f,q:1};save();render();return nk}
+ return move(k,{c:y,f})}
+async function detLangs(k,back){
+ const x=col[k],sel=$('#dlg');if(!x)return;
+ try{
+  const c=x.c,d=await(await fetch('https://api.scryfall.com/cards/search?unique=prints&q='+encodeURIComponent(`e:${c.s} cn:"${c.cn}" lang:any`))).json(),L=d.data||[];
+  if(col[k]!==x||!L.length)return;
+  sel.innerHTML=L.map((y,i)=>`<option value="${i}"${y.id===c.id?' selected':''}>${LN[y.lang]||y.lang}</option>`).join('');
+  sel.onchange=()=>detail(moveOne(k,{c:slim(L[+sel.value])}),back);
+ }catch(e){}
+}
 async function detPrints(k,back){
  const x=col[k],sel=$('#dpr');if(!x)return;
  try{
@@ -220,9 +236,10 @@ async function detPrints(k,back){
 }
 function detail(k,back){
  const x=col[k];if(!x){$('#det').close();return}
- const c=x.c,p=price(x);
- $('#det').innerHTML=`<div class="dl"><img src="${back&&c.i2?c.i2:c.i}" alt="${esc(c.n)}"><div><h2>${esc(c.d||c.n)}</h2>${c.d?`<div style="color:var(--mu)">${esc(c.n)}</div>`:''}<div>${sym(c.mc)}</div><p>${esc(c.t)}\n${esc(c.o)}</p>
+ const c=x.c,p=price(x),lang=c.lg||(c.d?'de':'en');
+ $('#det').innerHTML=`<div class="dl"><img src="${back&&c.i2?c.i2:c.i}" alt="${esc(c.n)}"><div><h2 translate="no">${esc(c.d||c.n)}</h2>${c.d?`<div style="color:var(--mu)" translate="no">${esc(c.n)}</div>`:''}<div>${sym(c.mc)}</div><p translate="no">${esc(c.t)}\n${esc(c.o)}</p>
  <label class="fld">Edition<select id="dpr" class="sl"><option>${esc(c.sn)} (${esc(c.s.toUpperCase())}) #${esc(c.cn)}</option></select></label>
+ <label class="fld">Sprache (gilt für 1 Exemplar)<select id="dlg" class="sl"><option>${LN[lang]||lang}</option></select></label>
  <label class="fld">Ausführung<select id="dfo" class="sl">${fOpts(c,x.f)}</select></label>
  <label class="fld">Ordner<select id="dfl" class="sl"><option value="">Sammlung</option>${Object.entries(ct).map(([id,o])=>`<option value="${id}"${id===x.fo?' selected':''}>${esc(o.n)}${o.k==='d'?' (Deck)':''}</option>`).join('')}</select></label>
  <p>${p?eur(p)+' pro Karte, '+x.q+'x = '+eur(p*x.q):'Kein Preis verfügbar (Preise über „Mehr“ aktualisieren)'}</p>
@@ -236,7 +253,7 @@ function detail(k,back){
  if(c.i2)$('#fl').onclick=()=>detail(k,!back);
  $('#dfo').onchange=e=>detail(move(k,{f:e.target.value}),back);
  $('#dfl').onchange=e=>detail(move(k,{fo:e.target.value}),back);
- detPrints(k,back);
+ detPrints(k,back);detLangs(k,back);
 }
 $('#main').onclick=e=>{const k=e.target.closest('.card');if(k)detail(k.dataset.k)};
 $('#main').onkeydown=e=>{if(e.key==='Enter'){const k=e.target.closest('.card');if(k)detail(k.dataset.k)}};
@@ -307,7 +324,7 @@ $('#go').onclick=async()=>{
  if(res.length&&$('#rep').checked)for(const k in col)if(col[k].fo===fo)delete col[k];
  for(const[e,c]of res)put(c,e.q,dflt(c,e.f),fo);
  save();render();$('#go').disabled=false;
- st.textContent=`${res.length} von ${es.length} Einträgen hinzugefügt.`+(bad.length?`\nNicht gefunden (oder keine Verbindung zu Scryfall):\n${bad.map(e=>e.name).join('\n')}`:'');
+ st.textContent=`Hinzugefügt: ${res.length}/${es.length} Einträge.`+(bad.length?`\nNicht gefunden (oder keine Verbindung zu Scryfall):\n${bad.map(e=>e.name).join('\n')}`:'');
  if(!bad.length)$('#txt').value='';
 };
 
@@ -340,7 +357,7 @@ async function findOne(n){
 let starSeen=false;
 function showCard(c){
  found=c;const f=(c.card_faces||[])[0]||{},im=(c.image_uris||f.image_uris||{}).small||'',pe=c.prices&&c.prices.eur;
- $('#sres').innerHTML=`<img src="${im}" alt=""><div style="flex:1;min-width:150px"><b>${esc(c.printed_name||f.printed_name||c.name)}</b><br><small id="sset">${esc(c.set_name)} (${esc(c.set.toUpperCase())}) #${esc(c.collector_number)}</small><select id="spr" class="sl" aria-label="Edition wählen"><option>Editionen laden …</option></select><select id="sfo" class="sl" aria-label="Ausführung">${fOpts(c,starSeen?'foil':'')}</select></div><button class="pri" id="sadd">Hinzufügen</button><button id="sno">Weiter</button>`;
+ $('#sres').innerHTML=`<img src="${im}" alt=""><div style="flex:1;min-width:150px"><b translate="no">${esc(c.printed_name||f.printed_name||c.name)}</b><br><small id="sset">${esc(c.set_name)} (${esc(c.set.toUpperCase())}) #${esc(c.collector_number)}</small><select id="spr" class="sl" aria-label="Edition wählen"><option>Editionen laden …</option></select><select id="sfo" class="sl" aria-label="Ausführung">${fOpts(c,starSeen?'foil':'')}</select></div><button class="pri" id="sadd">Hinzufügen</button><button id="sno">Weiter</button>`;
  $('#sadd').onclick=addFound;loadPrints(c);
  $('#sno').onclick=()=>{lastAuto=found.oracle_id||found.name;found=null;$('#sres').innerHTML='';sst('Nächste Karte vor die Kamera halten.')};
 }
@@ -460,5 +477,169 @@ async function refresh(){
  save();render();b.textContent='Preise aktualisieren';
 }
 $('#pr').onclick=refresh;
-render();
+// Sprache der Oberfläche: deutsche Texte werden beim Anzeigen übersetzt
+const P=`Meine Sammlung|My collection|Ma collection|Mi colección
+Scannen|Scan|Scanner|Escanear
+Importieren|Import|Importer|Importar
+Filter|Filters|Filtres|Filtros
+Mehr|More|Plus|Más
+Backup speichern|Save backup|Enregistrer la sauvegarde|Guardar copia
+Backup laden|Load backup|Charger une sauvegarde|Cargar copia
+Als Text kopieren|Copy as text|Copier en texte|Copiar como texto
+Preise aktualisieren|Update prices|Actualiser les prix|Actualizar precios
+Kopiert|Copied|Copié|Copiado
+Sprache (gilt für 1 Exemplar)|Language (applies to 1 copy)|Langue (pour 1 exemplaire)|Idioma (para 1 ejemplar)
+Sprache|Language|Langue|Idioma
+Sammlung|Collection|Collection|Colección
+Ordner|Folders|Dossiers|Carpetas
+Decklisten|Decklists|Listes de decks|Listas de mazos
+Suchen (Name, Typ, Text)|Search (name, type, text)|Rechercher (nom, type, texte)|Buscar (nombre, tipo, texto)
+Suchen|Search|Rechercher|Buscar
+Suche|Searching|Recherche|Buscando
+Gruppieren|Group by|Grouper|Agrupar
+Sortieren|Sort by|Trier|Ordenar
+Keine|None|Aucun|Ninguno
+Farbe|Color|Couleur|Color
+Manawert|Mana value|Valeur de mana|Valor de maná
+Kartentyp|Card type|Type de carte|Tipo de carta
+Edition|Edition|Édition|Edición
+Seltenheit|Rarity|Rareté|Rareza
+Name A–Z|Name A–Z|Nom A–Z|Nombre A–Z
+Manakosten|Mana cost|Coût de mana|Coste de maná
+Preis|Price|Prix|Precio
+Zuletzt hinzugefügt|Recently added|Ajoutées récemment|Añadidas recientemente
+↑ aufsteigend|↑ ascending|↑ croissant|↑ ascendente
+↓ absteigend|↓ descending|↓ décroissant|↓ descendente
+Reihenfolge umkehren|Reverse order|Inverser l’ordre|Invertir orden
+Listenansicht|List view|Vue liste|Vista de lista
+Bildansicht|Image view|Vue images|Vista de imágenes
+Gew.|Com.|Com.|Com.
+Ung.|Unc.|Peu c.|Poco c.
+Selten|Rare|Rare|Rara
+Mythisch|Mythic|Mythique|Mítica
+Gewöhnlich|Common|Commune|Común
+Ungewöhnlich|Uncommon|Peu commune|Poco común
+Kreatur|Creature|Créature|Criatura
+Kreaturen|Creatures|Créatures|Criaturas
+Hexerei|Sorcery|Rituel|Conjuro
+Hexereien|Sorceries|Rituels|Conjuros
+Spontanzauber|Instants|Éphémères|Instantáneos
+Verzauberung|Enchantment|Enchantement|Encantamiento
+Verzauberungen|Enchantments|Enchantements|Encantamientos
+Artefakt|Artifact|Artefact|Artefacto
+Artefakte|Artifacts|Artefacts|Artefactos
+Schlachten|Battles|Batailles|Batallas
+Sonstige|Other|Autres|Otros
+Land|Land|Terrain|Tierra
+Länder|Lands|Terrains|Tierras
+Nicht foil|Non-foil|Non foil|Sin foil
+Alle Filter löschen|Clear all filters|Effacer tous les filtres|Borrar todos los filtros
+✕ Filter|✕ Filters|✕ Filtres|✕ Filtros
+Weiß|White|Blanc|Blanco
+Blau|Blue|Bleu|Azul
+Schwarz|Black|Noir|Negro
+Rot|Red|Rouge|Rojo
+Grün|Green|Vert|Verde
+Farblos|Colorless|Incolore|Incoloro
+Mehrfarbig|Multicolor|Multicolore|Multicolor
+Alle Karten|All cards|Toutes les cartes|Todas las cartas
+Karten|cards|cartes|cartas
+verschiedene|different|différentes|diferentes
+Gesamtwert ca.|Total value approx.|Valeur totale env.|Valor total aprox.
+Wert ca.|Value approx.|Valeur env.|Valor aprox.
+Sammlung:|Collection:|Collection :|Colección:
+angezeigt|shown|affichées|mostradas
+Noch keine Karten|No cards yet|Aucune carte pour l’instant|Aún no hay cartas
+Tippe auf „Importieren“ oder „Scannen“, um Karten hinzuzufügen.|Tap “Import” or “Scan” to add cards.|Touchez « Importer » ou « Scanner » pour ajouter des cartes.|Toca «Importar» o «Escanear» para añadir cartas.
+Keine Karte passt zu den Filtern.|No card matches the filters.|Aucune carte ne correspond aux filtres.|Ninguna carta coincide con los filtros.
+Noch nichts vorhanden.|Nothing here yet.|Rien pour l’instant.|Todavía no hay nada.
+Meine Ordner|My folders|Mes dossiers|Mis carpetas
+Meine Decklisten|My decklists|Mes listes de decks|Mis listas de mazos
+Name des neuen Ordners|Name of the new folder|Nom du nouveau dossier|Nombre de la carpeta nueva
+Ordnername|Folder name|Nom du dossier|Nombre de carpeta
+Ordner erstellen|Create folder|Créer un dossier|Crear carpeta
+Decklist einfügen|Paste decklist|Coller une decklist|Pegar lista de mazo
+Decklist|Decklist|Decklist|Lista de mazo
+‹ Zurück|‹ Back|‹ Retour|‹ Atrás
+Kein Ordner|No folder|Aucun dossier|Sin carpeta
+In Ordner|In folder|Dans un dossier|En carpeta
+Karten hinzufügen|Add cards|Ajouter des cartes|Añadir cartas
+Umbenennen|Rename|Renommer|Renombrar
+Löschen|Delete|Supprimer|Eliminar
+Karten importieren|Import cards|Importer des cartes|Importar cartas
+Liste einfügen, eine Karte pro Zeile, z. B.|Paste a list, one card per line, e.g.|Collez une liste, une carte par ligne, p. ex.|Pega una lista, una carta por línea, p. ej.
+oder|or|ou|o
+. Auch Exporte aus ManaBox, Moxfield oder Archidekt (Text oder CSV) funktionieren. Kartennamen können Deutsch oder Englisch sein (deutsche Namen werden einzeln gesucht, das dauert etwas länger).|. Exports from ManaBox, Moxfield or Archidekt (text or CSV) work too. Card names can be German or English (German names are searched one by one, which takes a bit longer).|. Les exports de ManaBox, Moxfield ou Archidekt (texte ou CSV) fonctionnent aussi. Les noms de cartes peuvent être en allemand ou en anglais (les noms allemands sont cherchés un par un, ce qui prend un peu plus de temps).|. También funcionan exportaciones de ManaBox, Moxfield o Archidekt (texto o CSV). Los nombres pueden ser alemanes o ingleses (los alemanes se buscan uno a uno, lo que tarda algo más).
+Ziel|Target|Destination|Destino
+➕ Neue Decklist …|➕ New decklist …|➕ Nouvelle decklist …|➕ Nueva lista de mazo …
+Name der neuen Decklist|Name of the new decklist|Nom de la nouvelle decklist|Nombre de la lista nueva
+Name der Decklist|Decklist name|Nom de la decklist|Nombre de la lista
+Inhalt des Ziels ersetzen|Replace content of target|Remplacer le contenu de la destination|Reemplazar contenido del destino
+Schließen|Close|Fermer|Cerrar
+Keine Karten erkannt. Bitte eine Karte pro Zeile einfügen.|No cards recognized. Please paste one card per line.|Aucune carte reconnue. Collez une carte par ligne.|No se reconocieron cartas. Pega una carta por línea.
+Lade Kartendaten|Loading card data|Chargement des données|Cargando datos de cartas
+Suche deutsche und unscharfe Namen|Searching German and fuzzy names|Recherche de noms allemands et approximatifs|Buscando nombres alemanes y aproximados
+Hinzugefügt:|Added:|Ajoutées :|Añadidas:
+Einträge|entries|entrées|entradas
+Nicht gefunden (oder keine Verbindung zu Scryfall):|Not found (or no connection to Scryfall):|Introuvable (ou pas de connexion à Scryfall) :|No encontradas (o sin conexión con Scryfall):
+Neue Decklist|New decklist|Nouvelle decklist|Lista nueva
+Karten scannen|Scan cards|Scanner des cartes|Escanear cartas
+Karte lesen|Read card|Lire la carte|Leer carta
+Foto aufnehmen|Take photo|Prendre une photo|Tomar foto
+Fertig|Done|Terminé|Listo
+Erkannter Name|Detected name|Nom détecté|Nombre detectado
+Erkannte Karten automatisch hinzufügen|Add detected cards automatically|Ajouter automatiquement les cartes détectées|Añadir cartas detectadas automáticamente
+Handy-Kamera wird geöffnet. Foto der Karte aufnehmen, die Karte sollte das Bild ausfüllen. Der Rest läuft automatisch.|Opening the phone camera. Take a photo of the card; it should fill the picture. The rest is automatic.|Ouverture de la caméra. Photographiez la carte, elle doit remplir l’image. Le reste est automatique.|Abriendo la cámara. Haz una foto de la carta, debe llenar la imagen. El resto es automático.
+Live-Kamera nicht erlaubt, die Handy-Kamera wird per Foto genutzt. Falls sie sich nicht öffnet: „Foto aufnehmen“ tippen.|Live camera not allowed; using the phone camera by photo instead. If it does not open, tap “Take photo”.|Caméra en direct refusée ; utilisation de la caméra par photo. Si elle ne s’ouvre pas, touchez « Prendre une photo ».|Cámara en vivo no permitida; se usa la cámara por foto. Si no se abre, toca «Tomar foto».
+Karte in den Rahmen halten, der Name liegt im gestrichelten Feld. Sie wird automatisch erkannt.|Hold the card in the frame, the name goes in the dashed box. It is detected automatically.|Placez la carte dans le cadre, le nom dans la zone en pointillés. Elle est reconnue automatiquement.|Coloca la carta en el marco, el nombre en el recuadro discontinuo. Se detecta automáticamente.
+Karte in den Rahmen halten, sie wird automatisch erkannt.|Hold the card in the frame, it is detected automatically.|Placez la carte dans le cadre, elle est reconnue automatiquement.|Coloca la carta en el marco, se detecta automáticamente.
+Stelle Zoom und Schärfe ein …|Adjusting zoom and focus …|Réglage du zoom et de la netteté …|Ajustando zoom y enfoque …
+Schärfe|Sharpness|Netteté|Nitidez
+Bild unscharf|Image blurry|Image floue|Imagen borrosa
+Karte ruhig halten, etwas Abstand nehmen und kurz warten, bis die Kamera scharfstellt.|Hold the card steady, move back a little and wait for the camera to focus.|Tenez la carte immobile, reculez un peu et attendez la mise au point.|Mantén la carta quieta, aléjate un poco y espera el enfoque.
+Diese Karte ist schon verarbeitet. Nächste Karte vor die Kamera halten.|This card is already processed. Hold the next card in front of the camera.|Cette carte est déjà traitée. Présentez la carte suivante.|Esta carta ya está procesada. Muestra la siguiente.
+Karte erkannt. Mit „Hinzufügen“ bestätigen.|Card detected. Confirm with “Add”.|Carte reconnue. Confirmez avec « Ajouter ».|Carta detectada. Confirma con «Añadir».
+Gelesen:|Read:|Lu :|Leído:
+Passt zu keiner Karte. Ruhiger halten oder unten den Namen eintippen.|Matches no card. Hold steadier or type the name below.|Ne correspond à aucune carte. Stabilisez ou saisissez le nom ci-dessous.|No coincide con ninguna carta. Mantén firme o escribe el nombre abajo.
+Erkenne Text … (beim ersten Mal wird die Texterkennung geladen)|Reading text … (text recognition loads on first use)|Lecture du texte … (la reconnaissance se charge au premier usage)|Leyendo texto … (el reconocimiento se carga la primera vez)
+Texterkennung konnte nicht geladen werden (Internet?).|Text recognition could not be loaded (internet?).|Impossible de charger la reconnaissance de texte (internet ?).|No se pudo cargar el reconocimiento de texto (¿internet?).
+Kein Name erkannt. Karte näher und gerader halten oder den Namen eintippen.|No name detected. Hold the card closer and straighter or type the name.|Aucun nom détecté. Rapprochez et redressez la carte ou saisissez le nom.|Sin nombre detectado. Acerca y endereza la carta o escribe el nombre.
+Nichts gefunden. Name korrigieren und „Suchen“ tippen.|Nothing found. Correct the name and tap “Search”.|Rien trouvé. Corrigez le nom et touchez « Rechercher ».|Nada encontrado. Corrige el nombre y toca «Buscar».
+Stimmt die Karte? Edition prüfen, dann „Hinzufügen“.|Is this the card? Check the edition, then “Add”.|C’est la bonne carte ? Vérifiez l’édition, puis « Ajouter ».|¿Es esta carta? Revisa la edición y pulsa «Añadir».
+✓ Hinzugefügt|✓ Added|✓ Ajoutée|✓ Añadida
+in dieser Sitzung|in this session|dans cette session|en esta sesión
+Nächste Karte vor die Kamera halten.|Hold the next card in front of the camera.|Présentez la carte suivante.|Muestra la siguiente carta.
+Weiter|Next|Suivant|Siguiente
+Hinzufügen|Add|Ajouter|Añadir
+Editionen laden …|Loading editions …|Chargement des éditions …|Cargando ediciones …
+Editionen nicht ladbar|Editions could not be loaded|Éditions indisponibles|Ediciones no disponibles
+Edition wählen|Choose edition|Choisir l’édition|Elegir edición
+Ausführung|Finish|Finition|Acabado
+Geätzt|Etched|Etched|Etched
+pro Karte|per card|par carte|por carta
+Kein Preis verfügbar (Preise über „Mehr“ aktualisieren)|No price available (update prices via “More”)|Aucun prix (actualisez via « Plus »)|Sin precio (actualiza desde «Más»)
+Eine weniger|One less|Une de moins|Una menos
+Eine mehr|One more|Une de plus|Una más
+Rückseite|Back face|Face arrière|Reverso
+Entfernen|Remove|Retirer|Quitar
+Aktualisiere|Updating|Actualisation|Actualizando`;
+const IX={de:0,en:1,fr:2,es:3};
+const TM=new Map(P.split('\n').filter(Boolean).map(l=>{const a=l.split('|');return[a[0],a]}));
+const RX=new RegExp('(?<![\\p{L}\\d])('+[...TM.keys()].sort((a,b)=>b.length-a.length).map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')(?![\\p{L}])','gu');
+let ui='de';try{ui=localStorage.getItem('mtg-ui')||'de'}catch(e){}
+if(!(ui in IX))ui='de';
+const tr=s=>{if(ui==='de')return s;const m=s.match(/^(\s*)([\s\S]*?)(\s*)$/);return m[1]+m[2].replace(RX,x=>TM.get(x)[IX[ui]]||x)+m[3]};
+const skip=n=>!n||/^(SCRIPT|STYLE|TEXTAREA)$/.test(n.tagName)||(n.closest&&n.closest('[translate=no]'));
+function walk(r){
+ if(r.nodeType===3){if(skip(r.parentElement))return;if(r._t!==r.nodeValue)r._o=r.nodeValue;const t=tr(r._o);r._t=t;if(t!==r.nodeValue)r.nodeValue=t;return}
+ if(r.nodeType!==1||skip(r))return;
+ const w=document.createTreeWalker(r,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode())walk(n);
+ for(const e of [r,...r.querySelectorAll('[placeholder],[title],[aria-label]')])for(const a of ['placeholder','title','aria-label']){
+  if(!e.hasAttribute(a)||skip(e))continue;const k='_'+a,cur=e.getAttribute(a),st=e[k]||(e[k]={});
+  if(st.t!==cur)st.o=cur;const t=tr(st.o);st.t=t;if(t!==cur)e.setAttribute(a,t)}
+}
+$('#lg').value=ui;document.documentElement.lang=ui;
+$('#lg').onchange=e=>{ui=e.target.value;try{localStorage.setItem('mtg-ui',ui)}catch(x){}document.documentElement.lang=ui;render();walk(document.body)};
+render();walk(document.body);
+new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData')walk(m.target);else m.addedNodes.forEach(walk)}}).observe(document.body,{childList:true,subtree:true,characterData:true});
 </script></body></html>
