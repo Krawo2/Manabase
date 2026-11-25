@@ -294,6 +294,18 @@ async function readTitle(src,w,h,still){
  $('#sname').value=t;t.length<3?sst('Kein Name erkannt. Karte näher und gerader halten oder den Namen eintippen.'):await search(t);
 }
 let auto=0,lastAuto=null;const SHARP=80;
+let zc=null,zL=[],zI=0,zS={},zHold=0,fails=0;
+async function setZ(v){try{await stream.getVideoTracks()[0].applyConstraints({advanced:[{zoom:v}]})}catch(e){}}
+function zInit(){ // Zoomstufen aus den Kamerafähigkeiten des Handys
+ const t=stream.getVideoTracks()[0],c=t.getCapabilities?t.getCapabilities():{};zc=c.zoom||null;zS={};zI=0;zHold=0;fails=0;zL=[];
+ if(zc){const lo=zc.min,hi=Math.min(zc.max,lo*4);zL=[1,1.5,2,2.5,3].map(x=>Math.min(hi,Math.max(lo,x))).filter((x,i,a)=>a.indexOf(x)===i);setZ(zL[0])}
+ $('#diag').textContent+=' | Zoom: '+(zc?zc.min+' bis '+zc.max:'vom Browser nicht unterstützt');
+}
+async function autoZoom(s){ // probiert Zoomstufen durch und nimmt die mit dem schärfsten Titeltext
+ if(!zc||zL.length<2||Date.now()<zHold)return false;
+ zS[zI]=Math.max(zS[zI]||0,s);
+ if(Object.keys(zS).length<zL.length){zI=(zI+1)%zL.length;await setZ(zL[zI]);await wait(1000);return true}
+ const b=+Object.keys(zS).sort((a,c)=>zS[c]-zS[a])[0];zI=b;await setZ(zL[b]);zS={};zHold=Date.now()+8000;await wait(1000);return true}
 function sim(a,b){a=a.toLowerCase();b=b.toLowerCase();const m=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=m[0];m[0]=i;for(let j=1;j<=b.length;j++){const t=m[j];m[j]=Math.min(m[j]+1,m[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return 1-m[b.length]/Math.max(a.length,b.length,1)}
 async function autoLoop(){ // erkennt Karten fortlaufend, ohne Button
  const v=$('#vid'),id=++auto;
@@ -302,15 +314,15 @@ async function autoLoop(){ // erkennt Karten fortlaufend, ohne Button
   busy=true;let ok=false;
   try{
    const cv=crop(v,v.videoWidth,v.videoHeight,false),s=sharp(cv);
-   if(s<SHARP)sst(`Bild unscharf (Schärfe ${Math.round(s)}). Karte ruhig halten, etwas Abstand nehmen und kurz warten, bis die Kamera scharfstellt.`);
+   if(s<SHARP){if(await autoZoom(s))sst(`Stelle Zoom und Schärfe ein … ${zL[zI].toFixed(1)}x (Schärfe ${Math.round(s)})`);else sst(`Bild unscharf (Schärfe ${Math.round(s)}). Karte ruhig halten, etwas Abstand nehmen und kurz warten, bis die Kamera scharfstellt.`)}
    else{
     const t=await ocr(cv);
     if(t&&t.length>=3){
      const c=await findOne(t.replace(/"/g,'')),nm=c?[c.name,c.printed_name,...(c.card_faces||[]).map(f=>f.printed_name||f.name)].filter(Boolean):[];
-     if(c&&nm.some(x=>sim(t,x)>=.7)){ok=true;
+     if(c&&nm.some(x=>sim(t,x)>=.7)){ok=true;fails=0;
       if(c.id===lastAuto)sst('Diese Karte ist schon verarbeitet. Nächste Karte vor die Kamera halten.');
       else{$('#sname').value=t;showCard(c);if($('#aa').checked)addFound();else sst('Karte erkannt. Mit „Hinzufügen“ bestätigen.')}
-     }else{lastAuto=null;sst(`Gelesen: „${t}“. Passt zu keiner Karte. Ruhiger halten oder unten den Namen eintippen.`)}
+     }else{lastAuto=null;if(++fails>=3){fails=0;zS={};await autoZoom(s)}sst(`Gelesen: „${t}“. Passt zu keiner Karte. Ruhiger halten oder unten den Namen eintippen.`)}
     }else{lastAuto=null;sst('Karte in den Rahmen halten, sie wird automatisch erkannt.')}
    }
   }catch(e){}
@@ -320,7 +332,7 @@ async function autoLoop(){ // erkennt Karten fortlaufend, ohne Button
 $('#sc').onclick=async()=>{
  $('#scn').showModal();$('#sres').innerHTML='';const v=$('#vid'),b=$('.vw');b.style.display='';$('#diag').textContent='Diagnose: '+location.protocol+' | sicherer Kontext: '+(window.isSecureContext?'ja':'nein')+' | Kamera-API: '+(navigator.mediaDevices?'ja':'nein')+' | '+navigator.userAgent.slice(0,100);
  if(!window.isSecureContext||!navigator.mediaDevices){b.style.display='none';sst('Handy-Kamera wird geöffnet. Foto der Karte aufnehmen, die Karte sollte das Bild ausfüllen. Der Rest läuft automatisch.');$('#sfile').click();return}
- try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},audio:false});v.srcObject=stream;await v.play();try{await stream.getVideoTracks()[0].applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}autoLoop();
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},audio:false});v.srcObject=stream;await v.play();try{await stream.getVideoTracks()[0].applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}zInit();autoLoop();
   b.style.aspectRatio=v.videoWidth+'/'+v.videoHeight;b.style.width=`min(100%,${60*v.videoWidth/v.videoHeight}vh)`;
   sst('Karte in den Rahmen halten, der Name liegt im gestrichelten Feld. Sie wird automatisch erkannt.')}
  catch(e){$('#diag').textContent+=' | Fehler: '+(e&&e.name);b.style.display='none';sst('Live-Kamera nicht erlaubt, die Handy-Kamera wird per Foto genutzt. Falls sie sich nicht öffnet: „Foto aufnehmen“ tippen.');$('#sfile').click()}
