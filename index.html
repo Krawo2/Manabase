@@ -101,6 +101,7 @@ dialog{width:100vw;max-width:100vw;max-height:100dvh;border-radius:0;border:0}
 <div id="sstat" style="color:var(--mu);font-size:13px;margin:8px 0"></div>
 <div class="row"><input id="sname" placeholder="Erkannter Name" aria-label="Erkannter Name"><button id="sfind">Suchen</button></div>
 <div id="sres" class="row"></div>
+<div class="row"><label style="font-size:13px"><input type="checkbox" id="aa"> Erkannte Karten automatisch hinzufügen</label></div>
 <div class="row"><button class="pri" id="shot">Karte lesen</button><label id="spic" class="lb" for="sfile">Foto aufnehmen</label><button id="scl">Fertig</button></div>
 <div id="diag" style="color:var(--mu);font-size:11px;margin-top:10px;word-break:break-all"></div>
 <input type="file" id="sfile" class="vh" accept="image/*" capture="environment"></div></dialog>
@@ -259,29 +260,69 @@ async function findOne(n){
  try{return await js('https://api.scryfall.com/cards/named?fuzzy='+encodeURIComponent(n))}catch(e){}
  for(const q of[`lang:de !"${n}"`,`lang:de "${n}"`]){try{const d=await js('https://api.scryfall.com/cards/search?unique=prints&q='+encodeURIComponent(q));if(d.data.length)return d.data[0]}catch(e){}}
  return null}
+function showCard(c){
+ found=c;const f=(c.card_faces||[])[0]||{},im=(c.image_uris||f.image_uris||{}).small||'';
+ $('#sres').innerHTML=`<img src="${im}" alt=""><div style="flex:1"><b>${esc(c.printed_name||f.printed_name||c.name)}</b><br><small>${esc(c.set_name)}</small></div><button class="pri" id="sadd">Hinzufügen</button><button id="sno">Weiter</button>`;
+ $('#sadd').onclick=addFound;
+ $('#sno').onclick=()=>{lastAuto=found.id;found=null;$('#sres').innerHTML='';sst('Nächste Karte vor die Kamera halten.')};
+}
+function addFound(){
+ const c=found,x=col[c.id];x?x.q++:col[c.id]={c:slim(c),q:1,t:Date.now()};
+ save();render();cnt++;lastAuto=c.id;found=null;$('#sres').innerHTML='';$('#sname').value='';
+ sst(`✓ Hinzugefügt (${cnt} in dieser Sitzung). Nächste Karte vor die Kamera halten.`);if(!stream)$('#sfile').click();
+}
 async function search(n){
  sst('Suche „'+n+'“ …');const c=await findOne(n.replace(/"/g,''));
  if(!c){$('#sres').innerHTML='';sst('Nichts gefunden. Name korrigieren und „Suchen“ tippen.');return}
- found=c;const f=(c.card_faces||[])[0]||{},im=(c.image_uris||f.image_uris||{}).small||'';
- $('#sres').innerHTML=`<img src="${im}" alt=""><div style="flex:1"><b>${esc(c.printed_name||f.printed_name||c.name)}</b><br><small>${esc(c.set_name)}</small></div><button class="pri" id="sadd">Hinzufügen</button>`;
- $('#sadd').onclick=()=>{const x=col[found.id];x?x.q++:col[found.id]={c:slim(found),q:1,t:Date.now()};save();render();cnt++;$('#sres').innerHTML='';$('#sname').value='';sst(`✓ Hinzugefügt (${cnt} in dieser Sitzung). Nächste Karte lesen.`);if(!stream)$('#sfile').click()};
- sst('Stimmt die Karte? Dann „Hinzufügen“.');
+ showCard(c);sst('Stimmt die Karte? Dann „Hinzufügen“.');
 }
-async function readTitle(src,w,h,still){
+function crop(src,w,h,still){
  const gh=still?h:h*.8,gw=still?w:gh*488/680,x0=(w-gw)/2,y0=still?0:h*.1;
- const sx=x0+gw*.05,sw=gw*.72,sy=y0+gh*.035,sh=gh*.085,cv=document.createElement('canvas'),g=cv.getContext('2d');
- cv.width=sw;cv.height=sh;g.filter='grayscale(1) contrast(1.5)';g.drawImage(src,sx,sy,sw,sh,0,0,sw,sh);
+ const sx=x0+gw*.05,sw=gw*.72,sy=y0+gh*.035,sh=gh*.085,k=Math.min(3,Math.max(1,800/sw)),cv=document.createElement('canvas'),g=cv.getContext('2d');
+ cv.width=sw*k;cv.height=sh*k;g.filter='grayscale(1) contrast(1.6)';g.drawImage(src,sx,sy,sw,sh,0,0,cv.width,cv.height);return cv}
+function sharp(cv){ // Varianz des Laplace-Filters: hoch = scharf
+ const c=document.createElement('canvas'),w=c.width=220,h=c.height=Math.max(20,Math.round(220*cv.height/cv.width)),g=c.getContext('2d');
+ g.drawImage(cv,0,0,w,h);const d=g.getImageData(0,0,w,h).data,v=[];
+ for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;v.push(4*d[i]-d[i-4]-d[i+4]-d[i-w*4]-d[i+w*4])}
+ const m=v.reduce((a,b)=>a+b,0)/v.length;return v.reduce((a,b)=>a+(b-m)*(b-m),0)/v.length}
+async function ocr(cv){
+ try{await loadT();if(!worker)worker=await Tesseract.createWorker('eng+deu')}catch(e){sst('Texterkennung konnte nicht geladen werden (Internet?).');return null}
+ return(await worker.recognize(cv)).data.text.replace(/[^A-Za-zÀ-ÿ,' \-]/g,' ').replace(/\s+/g,' ').trim()}
+async function readTitle(src,w,h,still){
  sst('Erkenne Text … (beim ersten Mal wird die Texterkennung geladen)');
- try{await loadT();if(!worker)worker=await Tesseract.createWorker('eng+deu')}catch(e){sst('Texterkennung konnte nicht geladen werden (Internet?).');return}
- const t=(await worker.recognize(cv)).data.text.replace(/[^A-Za-zÀ-ÿ,' \-]/g,' ').replace(/\s+/g,' ').trim();
+ const t=await ocr(crop(src,w,h,still));if(t===null)return;
  $('#sname').value=t;t.length<3?sst('Kein Name erkannt. Karte näher und gerader halten oder den Namen eintippen.'):await search(t);
+}
+let auto=0,lastAuto=null;const SHARP=80;
+function sim(a,b){a=a.toLowerCase();b=b.toLowerCase();const m=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=m[0];m[0]=i;for(let j=1;j<=b.length;j++){const t=m[j];m[j]=Math.min(m[j]+1,m[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return 1-m[b.length]/Math.max(a.length,b.length,1)}
+async function autoLoop(){ // erkennt Karten fortlaufend, ohne Button
+ const v=$('#vid'),id=++auto;
+ while(id===auto&&stream&&$('#scn').open){
+  if(busy||found||!v.videoWidth){await wait(300);continue}
+  busy=true;let ok=false;
+  try{
+   const cv=crop(v,v.videoWidth,v.videoHeight,false),s=sharp(cv);
+   if(s<SHARP)sst(`Bild unscharf (Schärfe ${Math.round(s)}). Karte ruhig halten, etwas Abstand nehmen und kurz warten, bis die Kamera scharfstellt.`);
+   else{
+    const t=await ocr(cv);
+    if(t&&t.length>=3){
+     const c=await findOne(t.replace(/"/g,'')),nm=c?[c.name,c.printed_name,...(c.card_faces||[]).map(f=>f.printed_name||f.name)].filter(Boolean):[];
+     if(c&&nm.some(x=>sim(t,x)>=.7)){ok=true;
+      if(c.id===lastAuto)sst('Diese Karte ist schon verarbeitet. Nächste Karte vor die Kamera halten.');
+      else{$('#sname').value=t;showCard(c);if($('#aa').checked)addFound();else sst('Karte erkannt. Mit „Hinzufügen“ bestätigen.')}
+     }else{lastAuto=null;sst(`Gelesen: „${t}“. Passt zu keiner Karte. Ruhiger halten oder unten den Namen eintippen.`)}
+    }else{lastAuto=null;sst('Karte in den Rahmen halten, sie wird automatisch erkannt.')}
+   }
+  }catch(e){}
+  busy=false;await wait(ok?1200:500);
+ }
 }
 $('#sc').onclick=async()=>{
  $('#scn').showModal();$('#sres').innerHTML='';const v=$('#vid'),b=$('.vw');b.style.display='';$('#diag').textContent='Diagnose: '+location.protocol+' | sicherer Kontext: '+(window.isSecureContext?'ja':'nein')+' | Kamera-API: '+(navigator.mediaDevices?'ja':'nein')+' | '+navigator.userAgent.slice(0,100);
  if(!window.isSecureContext||!navigator.mediaDevices){b.style.display='none';sst('Handy-Kamera wird geöffnet. Foto der Karte aufnehmen, die Karte sollte das Bild ausfüllen. Der Rest läuft automatisch.');$('#sfile').click();return}
- try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920}},audio:false});v.srcObject=stream;await v.play();
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},audio:false});v.srcObject=stream;await v.play();try{await stream.getVideoTracks()[0].applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}autoLoop();
   b.style.aspectRatio=v.videoWidth+'/'+v.videoHeight;b.style.width=`min(100%,${60*v.videoWidth/v.videoHeight}vh)`;
-  sst('Karte in den Rahmen legen, der Name liegt im gestrichelten Feld.')}
+  sst('Karte in den Rahmen halten, der Name liegt im gestrichelten Feld. Sie wird automatisch erkannt.')}
  catch(e){$('#diag').textContent+=' | Fehler: '+(e&&e.name);b.style.display='none';sst('Live-Kamera nicht erlaubt, die Handy-Kamera wird per Foto genutzt. Falls sie sich nicht öffnet: „Foto aufnehmen“ tippen.');$('#sfile').click()}
 };
 $('#scn').addEventListener('close',()=>{stream&&stream.getTracks().forEach(t=>t.stop());stream=null});
