@@ -133,6 +133,8 @@ dialog.sheet{margin:0 0 0 auto;width:min(420px,100vw);max-width:100vw;height:100
 .sg{background:var(--pn);border:1px solid var(--ln);border-radius:12px;overflow:hidden}
 .srow{display:grid;gap:6px;padding:12px 14px;border-bottom:1px solid var(--ln);font-size:14px}.srow:last-child{border-bottom:0}.srow span{color:var(--mu);font-size:12px}
 .srow input,.srow select{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--ln);border-radius:6px;padding:8px 10px;width:100%}
+.arow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 14px}.arow p{margin:0;flex-basis:100%;font-size:14px}.lnk{background:none;border:0;color:var(--ac);padding:4px 0;text-decoration:underline}.lnk:hover{border:0}
+.srow input:disabled,.av:disabled{opacity:.55;cursor:default}
 .sb{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--ln);border-radius:0;padding:13px 14px}.sb:last-child{border-bottom:0}.sb:hover{background:var(--ln)}
 @media(max-width:640px){#pf{order:1}dialog.sheet{width:100vw;border-left:0}}
 .av.img{background-size:cover;background-position:center;background-color:transparent;color:transparent}label.av{cursor:pointer}
@@ -244,7 +246,11 @@ dialog::backdrop{background:rgba(5,15,14,.55);-webkit-backdrop-filter:blur(3px);
 <dialog id="set" class="sheet"><div class="sp">
 <div class="shd"><h2>Profil und Einstellungen</h2><button id="setx">Schließen</button></div>
 <section class="pcard"><button class="av big" id="pfa" title="Profilbild ändern" aria-label="Profilbild ändern">?</button><input type="file" id="pfi" class="vh" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"><div><b id="pfn"></b><small id="pfs"></small></div></section>
+<h3 class="sh">Konto</h3>
+<div class="sg" id="acc"></div>
+<p class="hint" id="accm" aria-live="polite"></p>
 <h3 class="sh">Profil</h3>
+<p class="hint" id="plk" hidden>Melde dich an, um ein Profil anzulegen.</p>
 <div class="sg"><label class="srow"><span>Dein Name</span><input id="pun" maxlength="40" placeholder="Name eingeben" autocomplete="nickname"></label><label class="srow"><span>Name der Sammlung</span><input id="pcn" maxlength="60" placeholder="Meine Sammlung"></label></div>
 <h3 class="sh">Allgemein</h3>
 <div class="sg"><label class="srow"><span>Sprache</span><select id="lg" translate="no"><option value="de">Deutsch</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option></select></label><label class="srow"><span>Land / Region</span><select id="rg" translate="no"></select></label></div>
@@ -264,7 +270,8 @@ const own=e=>e.fo===''||(ct[e.fo]&&ct[e.fo].k==='f');
 const FL={'':'Normal',foil:'Foil',etched:'Geätzt'};
 const migrate=o=>{const r={};for(const k in o){const e=o[k];e.f=e.f||'';e.fo=e.fo||'';e.b=e.b||'';r[k.includes('|')?k:k+'||']=e}return r};
 try{col=migrate(JSON.parse(localStorage.getItem(LS)||'{}'));ct=JSON.parse(localStorage.getItem(LS+'-ct')||'{}')}catch(e){}
-const save=()=>{try{localStorage.setItem(LS,JSON.stringify(col));localStorage.setItem(LS+'-ct',JSON.stringify(ct))}catch(e){alert('Speichern im Browser fehlgeschlagen. Bitte ein Backup exportieren.')}};
+const cloud=()=>{if(window.cloudSync)window.cloudSync()}; // Änderung an Cloud-Sync melden (Firebase-Modul unten)
+const save=()=>{try{localStorage.setItem(LS,JSON.stringify(col));localStorage.setItem(LS+'-ct',JSON.stringify(ct))}catch(e){alert('Speichern im Browser fehlgeschlagen. Bitte ein Backup exportieren.')}cloud()};
 const K=(id,f,fo,b)=>`${id}|${f}|${fo}${b?'|'+b:''}`;
 const RG=[['Europa','DE AT CH LI LU BE NL FR IT ES PT IE FI GR SK SI EE LV LT HR MT CY BG GB PL CZ HU SE NO DK RO IS TR'],['Nordamerika','US CA MX'],['Südamerika','BR'],['Asien und Pazifik','AU NZ JP KR CN SG HK IN MY TH PH ID'],['Afrika und Nahost','ZA IL']].map(([g,l])=>[g,l.split(' ')]);
 const CUR={GB:'GBP',CH:'CHF',LI:'CHF',PL:'PLN',CZ:'CZK',HU:'HUF',SE:'SEK',NO:'NOK',DK:'DKK',RO:'RON',IS:'ISK',TR:'TRY',US:'USD',CA:'CAD',MX:'MXN',BR:'BRL',AU:'AUD',NZ:'NZD',JP:'JPY',KR:'KRW',CN:'CNY',SG:'SGD',HK:'HKD',IN:'INR',MY:'MYR',TH:'THB',PH:'PHP',ID:'IDR',ZA:'ZAR',IL:'ILS'};
@@ -834,12 +841,12 @@ $('#pfi').onchange=async e=>{ // Bild quadratisch zuschneiden und verkleinert sp
  try{const im=await createImageBitmap(f,{premultiplyAlpha:'none',colorSpaceConversion:'default'}).catch(()=>createImageBitmap(f)),z=Math.min(im.width,im.height),cv=document.createElement('canvas');cv.width=cv.height=320;
   const g=cv.getContext('2d');g.imageSmoothingQuality='high';g.drawImage(im,(im.width-z)/2,(im.height-z)/2,z,z,0,0,320,320);
   let d=cv.toDataURL('image/webp',.92);if(!d.startsWith('data:image/webp'))d=cv.toDataURL('image/png'); // kein JPEG: Transparenz würde sonst schwarz und das Bild dunkler
-  localStorage.setItem('mtg-avatar',d);pfDraw()}
+  localStorage.setItem('mtg-avatar',d);pfDraw();cloud()}
  catch(x){alert(tr('Das Bild konnte nicht gespeichert werden.'))}};
 
 $('#set').addEventListener('click',e=>{if(e.target===$('#set'))$('#set').close()});
-$('#pun').oninput=e=>{try{localStorage.setItem('mtg-user',e.target.value.trim())}catch(x){}pfDraw()};
-$('#pcn').oninput=e=>{const v=e.target.value.trim();colName=v==='Meine Sammlung'?'':v;try{localStorage.setItem('mtg-name',colName)}catch(x){}setTitle();pfDraw()};
+$('#pun').oninput=e=>{try{localStorage.setItem('mtg-user',e.target.value.trim())}catch(x){}pfDraw();cloud()};
+$('#pcn').oninput=e=>{const v=e.target.value.trim();colName=v==='Meine Sammlung'?'':v;try{localStorage.setItem('mtg-name',colName)}catch(x){}setTitle();pfDraw();cloud()};
 setTitle();pfDraw();
 $('#pr').onclick=refresh;
 // Sprache der Oberfläche: deutsche Texte werden beim Anzeigen übersetzt
@@ -1074,7 +1081,41 @@ Verschoben:|Moved:|Déplacées :|Movidas:
 Ordner (für 1 Exemplar)|Folder (for 1 copy)|Dossier (pour 1 exemplaire)|Carpeta (para 1 ejemplar)
 Bitte erst Karten auswählen.|Please select cards first.|Sélectionnez d’abord des cartes.|Selecciona cartas primero.
 ohne Preis|without price|sans prix|sin precio
-Lade Preise …|Loading prices …|Chargement des prix …|Cargando precios …`;
+Lade Preise …|Loading prices …|Chargement des prix …|Cargando precios …
+Konto|Account|Compte|Cuenta
+E-Mail|Email|E-mail|Correo electrónico
+Passwort (mind. 6 Zeichen)|Password (min. 6 characters)|Mot de passe (6 caractères min.)|Contraseña (mín. 6 caracteres)
+Passwort|Password|Mot de passe|Contraseña
+Anmelden|Sign in|Se connecter|Iniciar sesión
+Registrieren|Sign up|S’inscrire|Registrarse
+Passwort vergessen?|Forgot password?|Mot de passe oublié ?|¿Olvidaste la contraseña?
+Abmelden|Sign out|Se déconnecter|Cerrar sesión
+Angemeldet als|Signed in as|Connecté en tant que|Sesión iniciada como
+Melde dich mit deiner E-Mail an, um ein Profil anzulegen. Es wird online gespeichert, damit du auf Handy und PC dieselbe Sammlung hast.|Sign in with your email to create a profile. It is stored online so you have the same collection on phone and PC.|Connecte-toi avec ton e-mail pour créer un profil. Il est enregistré en ligne pour avoir la même collection sur mobile et PC.|Inicia sesión con tu correo para crear un perfil. Se guarda en línea para tener la misma colección en el móvil y el PC.
+Melde dich an, um ein Profil anzulegen.|Sign in to create a profile.|Connecte-toi pour créer un profil.|Inicia sesión para crear un perfil.
+Bitte bestätige deine E-Mail-Adresse. Wir haben dir einen Link geschickt (auch im Spam-Ordner nachsehen).|Please confirm your email address. We sent you a link (check your spam folder too).|Confirme ton adresse e-mail. Nous t’avons envoyé un lien (vérifie aussi les spams).|Confirma tu correo. Te enviamos un enlace (revisa también el spam).
+Ich habe bestätigt|I have confirmed|J’ai confirmé|Ya lo confirmé
+Link erneut senden|Resend link|Renvoyer le lien|Reenviar enlace
+Noch nicht bestätigt. Öffne zuerst den Link in der E-Mail.|Not confirmed yet. Open the link in the email first.|Pas encore confirmé. Ouvre d’abord le lien dans l’e-mail.|Aún no confirmado. Abre primero el enlace del correo.
+Link gesendet.|Link sent.|Lien envoyé.|Enlace enviado.
+E-Mail zum Zurücksetzen gesendet.|Reset email sent.|E-mail de réinitialisation envoyé.|Correo de restablecimiento enviado.
+Bitte E-Mail eingeben.|Please enter your email.|Saisis ton e-mail.|Introduce tu correo.
+In der Cloud gespeichert.|Saved to the cloud.|Enregistré dans le cloud.|Guardado en la nube.
+Speichere …|Saving …|Enregistrement …|Guardando …
+Verbinde …|Connecting …|Connexion …|Conectando …
+Offline. Änderungen werden gespeichert, sobald du wieder online bist.|Offline. Changes are saved once you are back online.|Hors ligne. Les modifications seront enregistrées une fois en ligne.|Sin conexión. Los cambios se guardarán al volver a estar en línea.
+Änderungen von diesem Gerät und aus der Cloud wurden zusammengeführt.|Changes from this device and the cloud were merged.|Les modifications de cet appareil et du cloud ont été fusionnées.|Se combinaron los cambios de este dispositivo y de la nube.
+Cloud-Sync ist noch nicht eingerichtet.|Cloud sync is not set up yet.|La synchro cloud n’est pas encore configurée.|La sincronización en la nube aún no está configurada.
+Anmeldung gerade nicht erreichbar. Deine Daten bleiben auf diesem Gerät.|Sign-in is unavailable right now. Your data stays on this device.|Connexion indisponible pour le moment. Tes données restent sur cet appareil.|El inicio de sesión no está disponible. Tus datos se quedan en este dispositivo.
+Abmelden? Deine Daten bleiben in deinem Konto gespeichert und werden von diesem Gerät entfernt.|Sign out? Your data stays in your account and is removed from this device.|Se déconnecter ? Tes données restent dans ton compte et sont retirées de cet appareil.|¿Cerrar sesión? Tus datos se quedan en tu cuenta y se quitan de este dispositivo.
+Speichern in der Cloud fehlgeschlagen.|Saving to the cloud failed.|Échec de l’enregistrement dans le cloud.|Error al guardar en la nube.
+Ungültige E-Mail-Adresse.|Invalid email address.|Adresse e-mail invalide.|Correo no válido.
+E-Mail oder Passwort falsch.|Wrong email or password.|E-mail ou mot de passe incorrect.|Correo o contraseña incorrectos.
+Für diese E-Mail gibt es schon ein Konto. Bitte anmelden.|An account already exists for this email. Please sign in.|Un compte existe déjà pour cet e-mail. Connecte-toi.|Ya existe una cuenta con este correo. Inicia sesión.
+Das Passwort muss mindestens 6 Zeichen haben.|The password must have at least 6 characters.|Le mot de passe doit contenir au moins 6 caractères.|La contraseña debe tener al menos 6 caracteres.
+Zu viele Versuche. Bitte später erneut probieren.|Too many attempts. Please try again later.|Trop de tentatives. Réessaie plus tard.|Demasiados intentos. Inténtalo más tarde.
+Keine Verbindung zum Internet.|No internet connection.|Pas de connexion internet.|Sin conexión a internet.
+Das hat nicht geklappt.|That did not work.|Cela n’a pas fonctionné.|No ha funcionado.`;
 const IX={de:0,en:1,fr:2,es:3};
 const TM=new Map(P.split('\n').filter(Boolean).map(l=>{const a=l.split('|');return[a[0],a]}));
 const RX=new RegExp('(?<![\\p{L}\\d])('+[...TM.keys()].sort((a,b)=>b.length-a.length).map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')(?![\\p{L}])','gu');
@@ -1122,6 +1163,104 @@ $('#wcl').onclick=()=>$('#cwd').close();
 $('#cwd').addEventListener('click',e=>{if(e.target===$('#cwd'))$('#cwd').close()});
 loadFx();
 render();walk(document.body);
-try{if(Object.keys(col).length&&Date.now()-(+localStorage.getItem('mtg-pt')||0)>864e5)refresh()}catch(e){}
+const autoRefresh=()=>{try{if(Object.keys(col).length&&Date.now()-(+localStorage.getItem('mtg-pt')||0)>864e5)refresh()}catch(e){}};
+let wasIn=false;try{wasIn=!!localStorage.getItem('mtg-uid')}catch(e){}
+if(wasIn)window.afterSync=autoRefresh;else autoRefresh(); // angemeldet: Preise erst nach dem Abgleich mit der Cloud aktualisieren
 new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData')walk(m.target);else m.addedNodes.forEach(walk)}}).observe(document.body,{childList:true,subtree:true,characterData:true});
+</script>
+<script type="module">
+// Konto und Cloud-Sync mit Firebase (E-Mail + Passwort, Daten in Firestore unter users/{uid}).
+// Werte aus der Firebase-Konsole: Projekteinstellungen > Allgemein > Deine Apps > Web-App > SDK-Konfiguration.
+const FB={apiKey:'',authDomain:'',projectId:'',appId:''};
+const V='https://www.gstatic.com/firebasejs/10.12.2/',CH=250000; // Teilstücke, damit große Sammlungen unter dem Firestore-Limit von 1 MB pro Dokument bleiben
+const box=$('#acc'),msg=$('#accm');
+const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+const say=(t,err)=>{msg.textContent=t||'';msg.style.color=err?'#ff9b8f':''};
+const lock=on=>{for(const s of ['#pun','#pcn','#pfa'])$(s).disabled=on;$('#plk').hidden=!on};
+let dev=ls.get('mtg-dev');if(!dev){dev=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2));ls.set('mtg-dev',dev)}
+const done=()=>{const f=window.afterSync;window.afterSync=null;if(f)f()};
+const ERR={'auth/invalid-email':'Ungültige E-Mail-Adresse.','auth/invalid-credential':'E-Mail oder Passwort falsch.','auth/wrong-password':'E-Mail oder Passwort falsch.','auth/user-not-found':'E-Mail oder Passwort falsch.','auth/missing-password':'Das Passwort muss mindestens 6 Zeichen haben.','auth/weak-password':'Das Passwort muss mindestens 6 Zeichen haben.','auth/email-already-in-use':'Für diese E-Mail gibt es schon ein Konto. Bitte anmelden.','auth/too-many-requests':'Zu viele Versuche. Bitte später erneut probieren.','auth/network-request-failed':'Keine Verbindung zum Internet.'};
+const fail=e=>{console.warn(e);say(ERR[e&&e.code]||'Das hat nicht geklappt.',true)};
+
+if(!FB.apiKey){lock(false);box.innerHTML='<div class="arow"><p>Cloud-Sync ist noch nicht eingerichtet.</p></div>';done()}
+else{
+ lock(!ls.get('mtg-uid'));
+ let A,S;
+ try{[A,S]=await Promise.all([import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')])}catch(e){}
+ const app=A&&(await import(V+'firebase-app.js')).initializeApp(FB);
+ if(!app){lock(!ls.get('mtg-uid'));box.innerHTML='<div class="arow"><p>Anmeldung gerade nicht erreichbar. Deine Daten bleiben auf diesem Gerät.</p></div>';done()}
+ else{
+ const auth=A.getAuth(app),db=S.getFirestore(app);auth.languageCode=ui;
+ let me=null,uid=null,stop=null,tm=0,rn=0,applying=false,busy=null;
+ const st=()=>+ls.get('mtg-st')||0,lt=()=>+ls.get('mtg-lt')||0,dirty=()=>lt()>st();
+ const ref=()=>S.doc(db,'users',uid);
+
+ window.cloudSync=()=>{if(applying)return;ls.set('mtg-lt',Date.now());if(!uid)return;clearTimeout(tm);say('Speichere …');tm=setTimeout(push,1200)};
+ async function push(){ // ganze Sammlung und Profil hochladen
+  if(!uid)return;if(busy){await busy;if(!dirty())return}
+  const t=lt()||Date.now(),s=JSON.stringify({col,ct}),parts=[];for(let i=0;i<s.length;i+=CH)parts.push(s.slice(i,i+CH));if(!parts.length)parts.push('');
+  const u=ref(),b=S.writeBatch(db);
+  parts.forEach((p,i)=>b.set(S.doc(u,'parts',String(i)),{d:p}));
+  for(let i=parts.length;i<rn;i++)b.delete(S.doc(u,'parts',String(i)));
+  b.set(u,{t,dev,n:parts.length,user:uName(),name:colName,avatar:ls.get('mtg-avatar')||'',email:me.email||''});
+  busy=b.commit().then(()=>{rn=parts.length;if(lt()<=t){ls.set('mtg-st',t);say('In der Cloud gespeichert.')}},e=>{console.warn(e);say(navigator.onLine?'Speichern in der Cloud fehlgeschlagen.':'Offline. Änderungen werden gespeichert, sobald du wieder online bist.',navigator.onLine)});
+  await busy;busy=null}
+ async function pull(m){ // Teilstücke laden und zusammensetzen
+  const q=await S.getDocs(S.collection(ref(),'parts')),p=[];q.forEach(d=>p[+d.id]=d.data().d);rn=Math.max(q.size,m.n||0);
+  const d=p.slice(0,m.n).join('');return d?JSON.parse(d):{col:{},ct:{}}}
+ function apply(d,m,mergeLocal){
+  const lc=col,lct=ct,lu=uName(),ln=colName,la=ls.get('mtg-avatar');
+  applying=true;
+  col=migrate(mergeLocal?{...d.col,...lc}:(d.col||{}));ct=mergeLocal?{...(d.ct||{}),...lct}:(d.ct||{});
+  const nu=mergeLocal&&lu?lu:(m.user||''),nn=mergeLocal&&ln?ln:(m.name||''),na=mergeLocal&&la?la:(m.avatar||'');
+  ls.set('mtg-user',nu);colName=nn;ls.set('mtg-name',nn);na?ls.set('mtg-avatar',na):ls.del('mtg-avatar');
+  save();applying=false;
+  if($('#set').open){$('#pun').value=nu;$('#pcn').value=nn}
+  try{setTitle();pfDraw();render()}catch(e){console.warn(e)}} // Anzeigefehler sollen den Abgleich nicht abbrechen
+ async function onSnap(snap){
+  if(snap.metadata.hasPendingWrites)return;
+  try{
+   if(!snap.exists()){ls.set('mtg-st',0);if(!lt())ls.set('mtg-lt',Date.now());await push();return} // neues Profil: Daten dieses Geräts hochladen
+   const m=snap.data();
+   if(m.t===st()){if(dirty())await push();else say('In der Cloud gespeichert.');return}
+   if(m.dev===dev&&m.t<=lt()){ls.set('mtg-st',m.t);return} // eigene Änderung
+   const d=await pull(m),local=Object.keys(col).length||uName()||colName;
+   if(dirty()&&local){apply(d,m,true);ls.set('mtg-st',m.t);ls.set('mtg-lt',Date.now());await push();say('Änderungen von diesem Gerät und aus der Cloud wurden zusammengeführt.')}
+   else{apply(d,m,false);ls.set('mtg-st',m.t);ls.set('mtg-lt',m.t);say('In der Cloud gespeichert.')}
+  }catch(e){fail(e)}finally{done()}}
+ function start(u){
+  if(stop)return;uid=u.uid;
+  if(ls.get('mtg-uid')!==uid){ls.set('mtg-st',0);ls.set('mtg-uid',uid);if(Object.keys(col).length||uName()||colName)ls.set('mtg-lt',Date.now())} // erste Anmeldung auf diesem Gerät: vorhandene Daten zusammenführen statt überschreiben
+  say('Verbinde …');stop=S.onSnapshot(ref(),onSnap,fail)}
+ function draw(){
+  const em=me?`<b translate="no">${esc(me.email||'')}</b>`:'';
+  if(!me){lock(true);box.innerHTML=`<form id="afm" class="arow" style="display:grid;gap:10px" novalidate><p class="hint" style="margin:0">Melde dich mit deiner E-Mail an, um ein Profil anzulegen. Es wird online gespeichert, damit du auf Handy und PC dieselbe Sammlung hast.</p>
+<label class="srow" style="padding:0;border:0"><span>E-Mail</span><input id="aem" type="email" autocomplete="email" inputmode="email" required></label>
+<label class="srow" style="padding:0;border:0"><span>Passwort (mind. 6 Zeichen)</span><input id="apw" type="password" autocomplete="current-password" minlength="6" required></label>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="pri" id="ain">Anmelden</button><button type="button" id="aup">Registrieren</button><button type="button" class="lnk" id="arp">Passwort vergessen?</button></div></form>`;
+   const E=()=>$('#aem').value.trim(),P=()=>$('#apw').value;
+   $('#afm').onsubmit=async e=>{e.preventDefault();say('Verbinde …');try{await A.signInWithEmailAndPassword(auth,E(),P());say('')}catch(x){fail(x)}};
+   $('#aup').onclick=async()=>{say('Verbinde …');try{const c=await A.createUserWithEmailAndPassword(auth,E(),P());await A.sendEmailVerification(c.user);say('')}catch(x){fail(x)}};
+   $('#arp').onclick=async()=>{if(!E())return say('Bitte E-Mail eingeben.',true);try{await A.sendPasswordResetEmail(auth,E());say('E-Mail zum Zurücksetzen gesendet.')}catch(x){fail(x)}};
+   return}
+  if(!me.emailVerified){lock(true);box.innerHTML=`<div class="arow"><p>Angemeldet als ${em}</p><p class="hint" style="margin:0">Bitte bestätige deine E-Mail-Adresse. Wir haben dir einen Link geschickt (auch im Spam-Ordner nachsehen).</p><button class="pri" id="avf">Ich habe bestätigt</button><button id="ars">Link erneut senden</button><button id="aout">Abmelden</button></div>`;
+   $('#avf').onclick=check;
+   $('#ars').onclick=async()=>{try{await A.sendEmailVerification(me);say('Link gesendet.')}catch(x){fail(x)}};
+   $('#aout').onclick=out;return}
+  lock(false);box.innerHTML=`<div class="arow"><p>Angemeldet als ${em}</p><button id="aout">Abmelden</button></div>`;$('#aout').onclick=out}
+ async function check(quiet){
+  if(!me||me.emailVerified)return;
+  try{await me.reload();if(auth.currentUser.emailVerified){me=auth.currentUser;await me.getIdToken(true);draw();start(me)}else if(quiet!==true)say('Noch nicht bestätigt. Öffne zuerst den Link in der E-Mail.',true)}catch(x){if(quiet!==true)fail(x)}}
+ async function out(){
+  if(!confirm(tr('Abmelden? Deine Daten bleiben in deinem Konto gespeichert und werden von diesem Gerät entfernt.')))return;
+  clearTimeout(tm);if(uid&&dirty())await push();
+  if(stop)stop();stop=null;uid=null;await A.signOut(auth);
+  applying=true;col={};ct={};colName='';save();applying=false;
+  for(const k of ['mtg-user','mtg-name','mtg-avatar','mtg-uid','mtg-st','mtg-lt'])ls.del(k);
+  $('#pun').value='';$('#pcn').value='';setTitle();pfDraw();render();say('')}
+ A.onAuthStateChanged(auth,u=>{me=u;if(!u){if(stop)stop();stop=null;uid=null;done()}draw();if(u&&u.emailVerified)start(u);else if(u)done()});
+ addEventListener('focus',()=>check(true));document.addEventListener('visibilitychange',()=>{if(!document.hidden)check(true)});
+ addEventListener('online',()=>{if(uid&&dirty())push()});
+ }
+}
 </script></body></html>
