@@ -826,11 +826,11 @@ let colName='';try{colName=localStorage.getItem('mtg-name')||''}catch(e){}
 function setTitle(){const h=$('header h1');h.textContent=colName||'Meine Sammlung';h.setAttribute('translate',colName?'no':'yes');document.title=colName||'Magic-Sammlung'}
 const uName=()=>{try{return localStorage.getItem('mtg-user')||''}catch(e){return''}};
 function pfDraw(){ // Profilkarte und Avatar
- const u=uName(),ini=((u||colName||'?').trim()[0]||'?').toUpperCase(),n=$('#pfn');
+ const u=uName(),em=window.accEmail||'',ini=((u||em||'?').trim()[0]||'?').toUpperCase(),n=$('#pfn'); // Profil zeigt nur den Profilnamen, nie den Sammlungsnamen
  let img='';try{img=localStorage.getItem('mtg-avatar')||''}catch(e){}
  for(const a of [$('#pf'),$('#pfa')]){a.innerHTML=img?`<img src="${esc(img)}" alt="">`:esc(ini);a.style.backgroundImage='';a.classList.toggle('img',!!img)}
 
- n.textContent=u||colName||'Meine Sammlung';n.setAttribute('translate',u||colName?'no':'yes');
+ n.textContent=u||em||'Dein Profil';n.setAttribute('translate',u||em?'no':'yes');
  const a=Object.values(col).filter(own),q=a.reduce((t,e)=>t+e.q,0),v=Object.values(col).filter(e=>e.b!=='maybe').reduce((t,e)=>t+price(e)*e.q,0),cs=Object.values(ct);
  $('#pfs').textContent=`${q} Karten, ${cs.filter(x=>x.k==='f').length} Ordner, ${cs.filter(x=>x.k==='d').length} Decklisten, Wert ca. ${eur(v)}`}
 const hasAv=()=>{try{return!!localStorage.getItem('mtg-avatar')}catch(e){return false}};
@@ -846,12 +846,13 @@ $('#pfi').onchange=async e=>{ // Bild quadratisch zuschneiden und verkleinert sp
  catch(x){alert(tr('Das Bild konnte nicht gespeichert werden.'))}};
 
 $('#set').addEventListener('click',e=>{if(e.target===$('#set'))$('#set').close()});
-$('#pun').oninput=e=>{try{localStorage.setItem('mtg-user',e.target.value.trim())}catch(x){}pfDraw();cloud()};
+$('#pun').oninput=e=>{try{localStorage.setItem('mtg-user',e.target.value.trim())}catch(x){}pfDraw();if(window.accDraw)window.accDraw();cloud()};
 $('#pcn').oninput=e=>{const v=e.target.value.trim();colName=v==='Meine Sammlung'?'':v;try{localStorage.setItem('mtg-name',colName)}catch(x){}setTitle();pfDraw();cloud()};
 setTitle();pfDraw();
 $('#pr').onclick=refresh;
 // Sprache der Oberfläche: deutsche Texte werden beim Anzeigen übersetzt
 const P=`Meine Sammlung|My collection|Ma collection|Mi colección
+Dein Profil|Your profile|Ton profil|Tu perfil
 Scannen|Scan|Scanner|Escanear
 Importieren|Import|Importer|Importar
 Filter|Filters|Filtres|Filtros
@@ -1217,7 +1218,7 @@ else{
   ls.set('mtg-user',nu);colName=nn;ls.set('mtg-name',nn);na?ls.set('mtg-avatar',na):ls.del('mtg-avatar');
   save();applying=false;
   if($('#set').open){$('#pun').value=nu;$('#pcn').value=nn}
-  try{setTitle();pfDraw();render()}catch(e){console.warn(e)}} // Anzeigefehler sollen den Abgleich nicht abbrechen
+  try{setTitle();pfDraw();render();if(me)draw()}catch(e){console.warn(e)}} // Anzeigefehler sollen den Abgleich nicht abbrechen
  async function onSnap(snap){
   if(snap.metadata.hasPendingWrites)return;
   try{
@@ -1234,7 +1235,7 @@ else{
   if(ls.get('mtg-uid')!==uid){ls.set('mtg-st',0);ls.set('mtg-uid',uid);if(Object.keys(col).length||uName()||colName)ls.set('mtg-lt',Date.now())} // erste Anmeldung auf diesem Gerät: vorhandene Daten zusammenführen statt überschreiben
   say('Verbinde …');stop=S.onSnapshot(ref(),onSnap,fail)}
  function draw(){
-  const em=me?`<b translate="no">${esc(me.email||'')}</b>`:'';
+  const em=me?`<b translate="no">${esc(uName()||me.email||'')}</b>`:''; // Profilname, sonst E-Mail
   if(!me){lock(true);box.innerHTML=`<form id="afm" class="arow" style="display:grid;gap:10px" novalidate><p class="hint" style="margin:0">Melde dich mit deiner E-Mail an, um ein Profil anzulegen. Es wird online gespeichert, damit du auf Handy und PC dieselbe Sammlung hast.</p>
 <label class="srow" style="padding:0;border:0"><span>E-Mail</span><input id="aem" type="email" autocomplete="email" inputmode="email" required></label>
 <label class="srow" style="padding:0;border:0"><span>Passwort (mind. 6 Zeichen)</span><input id="apw" type="password" autocomplete="current-password" minlength="6" required></label>
@@ -1256,10 +1257,11 @@ else{
   if(!confirm(tr('Abmelden? Deine Daten bleiben in deinem Konto gespeichert und werden von diesem Gerät entfernt.')))return;
   clearTimeout(tm);if(uid&&dirty())await push();
   if(stop)stop();stop=null;uid=null;await A.signOut(auth);
-  applying=true;col={};ct={};colName='';save();applying=false;
+  window.accEmail='';applying=true;col={};ct={};colName='';save();applying=false;
   for(const k of ['mtg-user','mtg-name','mtg-avatar','mtg-uid','mtg-st','mtg-lt'])ls.del(k);
   $('#pun').value='';$('#pcn').value='';setTitle();pfDraw();render();say('')}
- A.onAuthStateChanged(auth,u=>{me=u;if(!u){if(stop)stop();stop=null;uid=null;done()}draw();if(u&&u.emailVerified)start(u);else if(u)done()});
+ window.accDraw=()=>{if(me)draw()};
+ A.onAuthStateChanged(auth,u=>{me=u;window.accEmail=u?u.email||'':'';pfDraw();if(!u){if(stop)stop();stop=null;uid=null;done()}draw();if(u&&u.emailVerified)start(u);else if(u)done()});
  addEventListener('focus',()=>check(true));document.addEventListener('visibilitychange',()=>{if(!document.hidden)check(true)});
  addEventListener('online',()=>{if(uid&&dirty())push()});
  }
