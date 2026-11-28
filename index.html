@@ -1171,7 +1171,7 @@ new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData')walk(m.
 <script type="module">
 // Konto und Cloud-Sync mit Firebase (E-Mail + Passwort, Daten in Firestore unter users/{uid}).
 // Werte aus der Firebase-Konsole: Projekteinstellungen > Allgemein > Deine Apps > Web-App > SDK-Konfiguration.
-const FB={apiKey:'',authDomain:'',projectId:'',appId:''};
+const FB={apiKey:'AIzaSyB-wLM01ELmeA_LVS9M_WDYMyUEVv7ekaM',authDomain:'manabase-156a0.firebaseapp.com',projectId:'manabase-156a0',appId:'1:81271713418:web:69c869c908dbea07798773'};
 const V='https://www.gstatic.com/firebasejs/10.12.2/',CH=250000; // Teilstücke, damit große Sammlungen unter dem Firestore-Limit von 1 MB pro Dokument bleiben
 const box=$('#acc'),msg=$('#accm');
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
